@@ -176,7 +176,7 @@ router.post("/:id/media-complete", authenticate, async (req: AuthRequest, res) =
       select: { id: true },
     });
     if (!wish) return res.status(404).json({ error: "Scheduled birthday wish not found." });
-    const blob = await head(v.pathname, { access: "private" });
+    const blob = await head(v.pathname);
     if (blob.contentType !== v.contentType) return res.status(400).json({ error: "Uploaded media type does not match the selected file." });
 
     await prisma.birthdayWish.update({
