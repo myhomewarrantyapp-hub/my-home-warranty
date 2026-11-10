@@ -296,7 +296,7 @@ async function sendWhatsApp(delivery: { recipient: string; subject: string | nul
   const template = delivery.birthdayWishId
     ? (process.env.WHATSAPP_WISH_TEMPLATE_NAME || "mhw_scheduled_wish")
     : (process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder");
-  const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\\/?|\\/$/g, "");
+    const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\/|\/$/g, "");
   const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
   if (!token || !phoneId) {
     throw new Error("WhatsApp is not configured. Add the Meta Cloud API access token and phone number ID in Vercel.");
@@ -304,7 +304,7 @@ async function sendWhatsApp(delivery: { recipient: string; subject: string | nul
   if (!/^v\\d+\\.\\d+$/.test(version)) {
     throw new Error("WHATSAPP_API_VERSION must look like v26.0.");
   }
-  const response = await fetch("https://graph.facebook.com/" + version.replace(/^\/?/, "") + "/" + phoneId + "/messages", {
+  const response = await fetch("https://graph.facebook.com/" + version + "/" + phoneId + "/messages",
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
     body: JSON.stringify({
