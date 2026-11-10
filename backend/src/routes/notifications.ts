@@ -122,7 +122,7 @@ router.get("/configuration", authenticate, async (_req, res) => {
       email: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL),
       whatsapp: whatsappBase,
       whatsappReminderTemplate: process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder",
-      whatsappBirthdayTemplate: process.env.WHATSAPP_BIRTHDAY_TEMPLATE_NAME || "mhw_birthday_wish",
+      whatsappWishTemplate: process.env.WHATSAPP_WISH_TEMPLATE_NAME || "mhw_scheduled_wish",
       whatsappApiVersion: process.env.WHATSAPP_API_VERSION || "v26.0",
       sms: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
       scheduler: Boolean(process.env.CRON_SECRET),
