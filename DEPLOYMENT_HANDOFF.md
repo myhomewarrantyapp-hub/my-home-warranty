@@ -27,5 +27,18 @@ CI previously passed dependency installation, Prisma validation/generation, Type
 8. Deploy to staging, verify critical workflows, backups, and restore procedures, then consider production.
 9. Keep `main` unchanged until the owner reviews and explicitly approves a pull request.
 
+## Supabase PostgreSQL setup (owner action required)
+
+The initial Prisma migration is committed at `backend/prisma/migrations/20261110090000_init/migration.sql`. CI now starts a temporary PostgreSQL 16 service and runs `prisma migrate deploy` plus `prisma migrate status` against it before building. This validates the migration in CI but does not touch the owner's Supabase project.
+
+To connect the real Supabase database safely:
+1. Open the Supabase project dashboard and select **Project Settings → Database → Connection string**. Use the URI connection string and require SSL. Prefer the Supabase pooler/session-compatible URI if deploying on serverless; follow the dashboard's current recommendation.
+2. In the Vercel project settings for the backend, set `DATABASE_URL` to that connection URI and set `JWT_SECRET` to a newly generated random value of at least 32 characters. Set `CORS_ORIGIN` to the exact deployed frontend origin. Never put these values in GitHub source, commits, screenshots, or chat.
+3. Set the Vercel project root to `backend`. Configure the build command to run `npm run db:generate && npm run db:migrate && npm run build` (Prisma migration deploy is versioned and repeatable). Deploy first to a private/staging environment and verify the build logs show the migration applied.
+4. If Vercel build logs report a database connectivity issue, stop and correct the connection string/network mode in the dashboard; do not paste the password into chat.
+5. After the first successful migration, create a normal account through the app, then use the documented admin-promotion procedure from a secure trusted environment to grant SUPER_ADMIN. Do not expose a public admin bootstrap endpoint.
+
+The assistant cannot access the owner's Supabase dashboard or secrets through this repository connection, so it cannot apply the migration to the live project or deploy Vercel on the owner's behalf. Do not enter real personal or financial data until staging workflows and security checks pass.
+
 ## Hosting and visibility
 GitHub Pages and the API are separate deployments. The private/maintenance switch blocks API access but cannot unpublish the static GitHub Pages site. Disable Pages separately if the entire site must be hidden.
