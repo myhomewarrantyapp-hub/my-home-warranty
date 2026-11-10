@@ -1,6 +1,18 @@
 -- Notification opt-ins, scheduled birthday wishes and a retryable outbox.
 -- Only the private backend database role may access these records directly.
 
+ALTER TABLE "Reminder"
+  ADD COLUMN "sourceType" TEXT,
+  ADD COLUMN "sourceId" TEXT,
+  ADD COLUMN "sourceKey" TEXT;
+CREATE UNIQUE INDEX "Reminder_sourceKey_key" ON "Reminder"("sourceKey");
+
+ALTER TABLE "MoneyEntry"
+  ADD COLUMN "contactReminderEnabled" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "contactWhatsAppEnabled" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "contactSmsEnabled" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "contactReminderConsentAt" TIMESTAMP(3);
+
 CREATE TABLE "NotificationPreference" (
   "id" TEXT NOT NULL,
   "ownerUserId" TEXT NOT NULL,
@@ -51,6 +63,7 @@ CREATE TABLE "NotificationDelivery" (
   "ownerUserId" TEXT NOT NULL,
   "reminderId" TEXT,
   "birthdayWishId" TEXT,
+  "moneyEntryId" TEXT,
   "channel" TEXT NOT NULL,
   "recipient" TEXT NOT NULL,
   "subject" TEXT,
@@ -77,6 +90,7 @@ CREATE INDEX "NotificationDelivery_status_nextAttemptAt_idx" ON "NotificationDel
 CREATE INDEX "NotificationDelivery_ownerUserId_createdAt_idx" ON "NotificationDelivery"("ownerUserId","createdAt");
 CREATE INDEX "NotificationDelivery_reminderId_idx" ON "NotificationDelivery"("reminderId");
 CREATE INDEX "NotificationDelivery_birthdayWishId_idx" ON "NotificationDelivery"("birthdayWishId");
+CREATE INDEX "NotificationDelivery_moneyEntryId_idx" ON "NotificationDelivery"("moneyEntryId");
 
 ALTER TABLE "NotificationPreference" ADD CONSTRAINT "NotificationPreference_ownerUserId_fkey"
   FOREIGN KEY ("ownerUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -88,6 +102,8 @@ ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_reminder
   FOREIGN KEY ("reminderId") REFERENCES "Reminder"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_birthdayWishId_fkey"
   FOREIGN KEY ("birthdayWishId") REFERENCES "BirthdayWish"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_moneyEntryId_fkey"
+  FOREIGN KEY ("moneyEntryId") REFERENCES "MoneyEntry"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "NotificationPreference" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "BirthdayWish" ENABLE ROW LEVEL SECURITY;
