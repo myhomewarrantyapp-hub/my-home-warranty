@@ -19,8 +19,12 @@ router.post("/dispatch", async (req, res) => {
     const result = await dispatchDueNotifications();
     res.setHeader("Cache-Control", "no-store");
     res.json({ success: true, ...result, ranAt: new Date().toISOString() });
-  } catch {
-    res.status(500).json({ error: "Notification dispatch failed." });
+  } catch (error) {
+    console.error("Notification dispatch failed:", error);
+    res.status(500).json({
+      error: "Notification dispatch failed.",
+      detail: error instanceof Error ? error.message.slice(0, 500) : "Unknown dispatcher error",
+    });
   }
 });
 
