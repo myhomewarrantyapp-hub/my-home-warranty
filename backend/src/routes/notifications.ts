@@ -116,14 +116,80 @@ router.get("/deliveries", authenticate, async (req: AuthRequest, res) => {
 });
 
 router.get("/configuration", authenticate, async (_req, res) => {
+  const whatsappBase = Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
   res.json({
     providers: {
       email: Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL),
-      whatsapp: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_TEMPLATE_NAME && process.env.WHATSAPP_API_VERSION),
+      whatsapp: whatsappBase,
+      whatsappReminderTemplate: process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder",
+      whatsappBirthdayTemplate: process.env.WHATSAPP_BIRTHDAY_TEMPLATE_NAME || "mhw_birthday_wish",
+      whatsappApiVersion: process.env.WHATSAPP_API_VERSION || "v26.0",
       sms: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER),
       scheduler: Boolean(process.env.CRON_SECRET),
     },
   });
+});
+
+// Sends a single utility-template test only to the signed-in account's own mobile.
+// The user must click the test button and explicitly confirm this action.
+router.post("/whatsapp/test", authenticate, async (req: AuthRequest, res) => {
+  try {
+    const request = z.object({ confirmSend: z.literal(true) }).parse(req.body);
+    if (!request.confirmSend) return res.status(400).json({ error: "Confirm the test message first." });
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!token || !phoneId) {
+      return res.status(409).json({ error: "WhatsApp setup is incomplete. Add the Meta access token and phone number ID to Vercel first." });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { mobile: true },
+    });
+    if (!user?.mobile) {
+      return res.status(400).json({ error: "Add your own mobile number to this account before sending a test." });
+    }
+    const digits = user.mobile.replace(/\\D/g, "");
+    const recipient = /^91[6-9]\\d{9}$/.test(digits) ? digits : /^[6-9]\\d{9}$/.test(digits) ? "91" + digits : "";
+    if (!recipient) return res.status(400).json({ error: "The account mobile number is not a valid Indian mobile number." });
+    const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\\/?|\\/$/g, "");
+    if (!/^v\\d+\\.\\d+$/.test(version)) return res.status(400).json({ error: "WHATSAPP_API_VERSION must look like v26.0." });
+    const template = process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder";
+    const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
+    const response = await fetch("https://graph.facebook.com/" + version + "/" + phoneId + "/messages", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: recipient,
+        type: "template",
+        template: {
+          name: template,
+          language: { code: language },
+          components: [{
+            type: "body",
+            parameters: [
+              { type: "text", text: "My Home Warranty test" },
+              { type: "text", text: "WhatsApp Cloud API connection is working." },
+            ],
+          }],
+        },
+      }),
+    });
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = String(data.error?.message || "Meta rejected the test message.").slice(0, 350);
+      return res.status(response.status === 401 || response.status === 403 ? 502 : 400).json({ error: detail });
+    }
+    res.json({
+      success: true,
+      message: "Meta accepted the test message request.",
+      providerMessageId: String(data.messages?.[0]?.id || ""),
+      recipientLastFour: recipient.slice(-4),
+    });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send WhatsApp test." });
+  }
 });
 
 export default router;
