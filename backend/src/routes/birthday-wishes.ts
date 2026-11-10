@@ -57,10 +57,11 @@ router.get("/", authenticate, async (req: AuthRequest, res) => {
 
 router.post("/", authenticate, async (req: AuthRequest, res) => {
   const schema = z.object({
+    wishType: z.enum(["BIRTHDAY", "ANNIVERSARY", "FESTIVAL", "CONGRATULATIONS", "HOUSEWARMING", "CUSTOM"]).default("BIRTHDAY"),
     recipientName: z.string().min(1).max(120),
     recipientMobile: mobileSchema.optional(),
     recipientEmail: z.string().email().max(254).optional(),
-    birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     scheduledAt: z.string().datetime(),
     timezone: z.string().min(1).max(80).default("Asia/Kolkata"),
     message: z.string().max(1200).optional(),
@@ -72,6 +73,9 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
     smsConsent: z.boolean().default(false),
     emailConsent: z.boolean().default(false),
   }).superRefine((v, ctx) => {
+    if (v.wishType === "BIRTHDAY" && !v.birthDate) {
+      ctx.addIssue({ code: "custom", message: "Enter the date of birth for a birthday wish." });
+    }
     if (!v.whatsappEnabled && !v.smsEnabled && !v.emailEnabled) {
       ctx.addIssue({ code: "custom", message: "Choose at least one delivery channel." });
     }
@@ -88,16 +92,17 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
   try {
     const v = schema.parse(req.body);
     if (new Date(v.scheduledAt).getTime() <= Date.now()) {
-      return res.status(400).json({ error: "Choose a future date and time so the birthday wish remains a surprise." });
+      return res.status(400).json({ error: "Choose a future date and time so the wish remains a surprise." });
     }
     const now = new Date();
     const wish = await prisma.birthdayWish.create({
       data: {
         ownerUserId: req.userId!,
+        wishType: v.wishType,
         recipientName: v.recipientName,
         recipientMobile: v.recipientMobile,
         recipientEmail: v.recipientEmail?.toLowerCase(),
-        birthDate: new Date(v.birthDate + "T12:00:00.000Z"),
+        birthDate: v.birthDate ? new Date(v.birthDate + "T12:00:00.000Z") : null,
         scheduledAt: new Date(v.scheduledAt),
         timezone: v.timezone,
         message: v.message,
@@ -134,7 +139,7 @@ router.post("/:id/media-upload-url", authenticate, async (req: AuthRequest, res)
       where: { id: req.params.id, ownerUserId: req.userId, status: "SCHEDULED" },
       select: { id: true },
     });
-    if (!wish) return res.status(404).json({ error: "Scheduled birthday wish not found." });
+    if (!wish) return res.status(404).json({ error: "Scheduled wish not found." });
 
     const extension = ({
       "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
