@@ -151,8 +151,8 @@ router.post("/whatsapp/test", authenticate, async (req: AuthRequest, res) => {
     const digits = user.mobile.replace(/\\D/g, "");
     const recipient = /^91[6-9]\\d{9}$/.test(digits) ? digits : /^[6-9]\\d{9}$/.test(digits) ? "91" + digits : "";
     if (!recipient) return res.status(400).json({ error: "The account mobile number is not a valid Indian mobile number." });
-    const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\/|\/$/g, "");
-    if (!/^v\d+\.\d+$/.test(version)) return res.status(400).json({ error: "WHATSAPP_API_VERSION must look like v26.0." });
+    const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replaceAll("/", "");
+    if (!/^v[0-9]+[.][0-9]+$/.test(version)) return res.status(400).json({ error: "WHATSAPP_API_VERSION must look like v26.0." });
     const template = process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder";
     const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
     const response = await fetch("https://graph.facebook.com/" + version + "/" + phoneId + "/messages", {
