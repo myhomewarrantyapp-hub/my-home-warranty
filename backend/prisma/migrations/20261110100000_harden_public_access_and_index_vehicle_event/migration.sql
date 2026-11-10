@@ -14,7 +14,7 @@ BEGIN
   END LOOP;
 
   IF to_regprocedure('public.rls_auto_enable()') IS NOT NULL THEN
-    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC;
+    EXECUTE 'REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC';
     FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
       IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
         EXECUTE format('REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM %I', role_name);
