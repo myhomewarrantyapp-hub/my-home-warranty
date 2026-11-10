@@ -25,7 +25,8 @@ function e164(value: string) {
 async function enqueue(items: DeliveryInput[]) {
   if (!items.length) return 0;
   const result = await prisma.notificationDelivery.createMany({
-    data: items.map((item) => ({ ...item, status: "QUEUED", nextAttemptAt: new Date() })),
+    // Never dispatch before each message's scheduled time.
+    data: items.map((item) => ({ ...item, status: "QUEUED", nextAttemptAt: item.scheduledAt })),
     skipDuplicates: true,
   });
   return result.count;
