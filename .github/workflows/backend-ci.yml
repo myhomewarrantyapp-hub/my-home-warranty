@@ -29,3 +29,11 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
       - run: npx prisma generate
       - run: npm run build
+      - name: Validate frontend JavaScript
+        working-directory: .
+        run: |
+          node -e "const fs=require('fs'); const html=fs.readFileSync('frontend/index.html','utf8'); const match=html.match(/<script>([\\s\\S]*?)<\\/script>/); if(!match) throw new Error('Inline application script not found'); fs.writeFileSync('/tmp/mhw-frontend.js',match[1]);"
+          node --check /tmp/mhw-frontend.js
+      - name: Validate translation JSON
+        working-directory: .
+        run: node -e "JSON.parse(require('fs').readFileSync('translations/te.json','utf8')); console.log('Telugu translation JSON valid')"
