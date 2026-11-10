@@ -1,6 +1,6 @@
 import { prisma } from "../db";
+import { createHash, randomBytes } from "node:crypto";
 
-type Channel = "WHATSAPP" | "SMS" | "EMAIL";
 type DeliveryInput = {
   ownerUserId: string;
   reminderId?: string;
@@ -101,7 +101,7 @@ async function queueDueBirthdays(now: Date) {
     const items: DeliveryInput[] = [];
     let shareUrl = "";
     if (wish.mediaPath) {
-      const token = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex");
+      const token = randomBytes(32).toString("hex");
       const tokenHash = createHash(token);
       const expiry = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       await prisma.birthdayWish.update({
@@ -159,10 +159,6 @@ async function queueDueBirthdays(now: Date) {
     });
   }
   return { scanned: due.length, queued };
-}
-
-function createHash(value: string) {
-  return require("node:crypto").createHash("sha256").update(value).digest("hex");
 }
 
 function escapeHtml(value: string) {
