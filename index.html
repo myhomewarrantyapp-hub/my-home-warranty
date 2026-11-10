@@ -113,11 +113,20 @@
   </aside>
 </div></body><script>
 const $=id=>document.getElementById(id);let token=sessionStorage.getItem('mhw_token')||'';let base=localStorage.getItem('mhw_base')||'https://my-home-warranty-api.vercel.app';$('base').value=base;
+let dashboardData={assets:[],vehicles:[],bills:[],entries:[],policies:[],reminders:[],requests:[],documents:[]};
+let currentUser=null;try{currentUser=JSON.parse(sessionStorage.getItem('mhw_user')||'null')}catch{}
+const moneyFmt=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0});
+const safeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate=v=>{if(!v)return 'Date not set';const d=new Date(v);return Number.isNaN(d.getTime())?'Date not set':d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})};
+function applyUser(user){currentUser=user||null;const name=currentUser?.name||'Your Account';if($('profileName'))$('profileName').textContent=name;if($('profileAvatar'))$('profileAvatar').textContent=(name.trim()[0]||'U').toUpperCase();if($('securityUser'))$('securityUser').textContent=currentUser?.name||'Not signed in';if($('securitySession'))$('securitySession').textContent=token?'Signed in':'Signed out';if($('sidebarStatus'))$('sidebarStatus').textContent=token?'Account connected':'Sign in to connect';}
+
 function page(id){
- document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!==id));
- document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
- if(!token)return;
- if(id==='dashboard')refreshAll();
+ document.querySelectorAll('#mainContent > section').forEach(s=>s.classList.toggle('hidden',s.id!==id));
+ document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+ $('dashboardAside').classList.toggle('hidden',id!=='dashboard');
+ if($('sidebar'))$('sidebar').classList.remove('open');
+ if(id==='dashboard'){if(token)refreshAll();else renderDashboard();return;}
+ if(!token){if(id==='settings')return;const targets={assets:'assetRows',vehicles:'vehicleRows',payments:'billRows',insurance:'insuranceRows',reminders:'reminderRows',documents:'documentsRows',support:'supportRows'};if(targets[id]&&$(targets[id]))$(targets[id]).textContent='Sign in to view and manage your private records.';return;}
  if(id==='assets')load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]);
  if(id==='vehicles')loadVehicles();
  if(id==='payments')setPaymentTab('home').catch(e=>$('billRows').textContent=e.message);
@@ -127,32 +136,78 @@ function page(id){
  if(id==='support')load('s','/v1/support/tickets','tickets','supportRows',[['subject','Subject'],['status','Status'],['createdAt','Created']]);
  if(id==='admin')loadSiteControl();
 }
+function toggleSidebar(){$('sidebar').classList.toggle('open');}
+function toggleProfileMenu(){$('profileMenu').classList.toggle('hidden');$('addMenu').classList.add('hidden');}
+function showAddMenu(){$('addMenu').classList.toggle('hidden');$('profileMenu').classList.add('hidden');}
+function openNew(target,tab){$('addMenu').classList.add('hidden');page(target);if(target==='payments'&&tab)setPaymentTab(tab);const ids={assets:'assetForm',vehicles:'vehicleForm',payments:tab==='given'?'moneyForm':'billForm',insurance:'insuranceForm',reminders:'reminderForm'};setTimeout(()=>{const el=$(ids[target]);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},80);}
+function searchRecords(query){
+ const root=$('searchResults'),q=String(query||'').trim().toLowerCase();
+ if(!q){root.classList.add('hidden');root.innerHTML='';return;}
+ if(!token){root.innerHTML='<p class="empty-note">Sign in to search your records.</p>';root.classList.remove('hidden');return;}
+ const sources=[
+  ...dashboardData.assets.map(x=>({label:x.title,detail:x.category,type:'Asset',page:'assets'})),
+  ...dashboardData.vehicles.map(x=>({label:x.nickname,detail:x.makeModel||'Vehicle',type:'Vehicle',page:'vehicles'})),
+  ...dashboardData.bills.map(x=>({label:x.provider||x.billType,detail:moneyFmt(x.amount)+' · '+fmtDate(x.dueDate),type:'Bill',page:'payments'})),
+  ...dashboardData.entries.map(x=>({label:x.personName,detail:x.direction+' · '+moneyFmt(x.balance),type:'Money',page:'payments'})),
+  ...dashboardData.policies.map(x=>({label:x.insurer,detail:x.policyType,type:'Insurance',page:'insurance'})),
+  ...dashboardData.reminders.map(x=>({label:x.title,detail:fmtDate(x.dueAt),type:'Reminder',page:'reminders'}))
+ ];
+ const hits=sources.filter(x=>(x.label+' '+x.detail+' '+x.type).toLowerCase().includes(q)).slice(0,8);
+ root.innerHTML=hits.length?hits.map((x,i)=>'<button class="search-result" onclick="page(\''+x.page+'\');$(\'globalSearch\').value=\'\';searchRecords(\'\')"><span><strong>'+safeHtml(x.label)+'</strong><br><small>'+safeHtml(x.detail)+'</small></span><small>'+safeHtml(x.type)+' →</small></button>').join(''):'<p class="empty-note">No matching records found.</p>';
+ root.classList.remove('hidden');
+}
+function renderDashboard(){
+ const d=dashboardData;
+ const assets=d.assets||[],vehicles=d.vehicles||[],bills=d.bills||[],entries=d.entries||[],policies=d.policies||[],reminders=(d.reminders||[]).filter(x=>x.status==='PENDING'),docs=d.documents||[];
+ const billTotal=bills.reduce((n,x)=>n+Number(x.amount||0),0);
+ const given=entries.filter(x=>x.direction==='GIVEN'),received=entries.filter(x=>x.direction==='RECEIVED');
+ const balance=a=>a.reduce((n,x)=>n+Number(x.balance||0),0);
+ const warranty=assets.filter(x=>x.warrantyEnd&&new Date(x.warrantyEnd)>=new Date()).length;
+ $('assetCount').textContent=assets.length;$('vehicleCount').textContent=vehicles.length;$('billCount').textContent=bills.length;$('moneyCount').textContent=entries.length;
+ $('assetTileCount').textContent=assets.length+' saved items';$('paymentTileCount').textContent=(bills.length+entries.length)+' records';$('insuranceTileCount').textContent=policies.length+' policies';$('documentTileCount').textContent=docs.length+' files';
+ $('overviewBills').textContent=moneyFmt(billTotal);$('overviewMoney').textContent=String(entries.length);$('overviewWarranties').textContent=String(warranty);$('overviewPolicies').textContent=String(policies.length);
+ $('moneyGivenBalance').textContent=moneyFmt(balance(given));$('moneyReceivedBalance').textContent=moneyFmt(balance(received));$('moneyGivenCount').textContent=given.length+' records';$('moneyReceivedCount').textContent=received.length+' records';
+ $('dashboardVehicles').innerHTML=vehicles.length?vehicles.slice(0,2).map(v=>'<div class="mini-vehicle"><div class="mini-vehicle-illustration">'+(/bike|scooter|two.?wheeler/i.test((v.makeModel||'')+' '+(v.nickname||''))?'🏍️':'🚙')+'</div><div><strong>'+safeHtml(v.nickname)+'</strong><small>'+safeHtml(v.makeModel||'Vehicle')+(v.registrationLastFour?' · •••• '+safeHtml(v.registrationLastFour):'')+'</small><small>Odometer: '+safeHtml(v.currentOdometer??'—')+' km</small><span class="mini-tag">Saved in your account</span></div></div>').join(''):'<p class="empty-note">No vehicles added yet. Use ＋ Add Vehicle to begin.</p>';
+ $('dashboardAssets').innerHTML=assets.length?assets.slice(0,3).map(a=>'<div class="asset-mini"><span class="asset-icon">'+(/ac|air.?condition/i.test(a.category+' '+a.title)?'❄️':/fridge|refrigerator/i.test(a.category+' '+a.title)?'🧊':/wash/i.test(a.category+' '+a.title)?'🧺':'⌂')+'</span><div class="asset-content"><strong>'+safeHtml(a.title)+'</strong><small>'+safeHtml(a.category)+' · Warranty: '+fmtDate(a.warrantyEnd)+'</small></div><span class="warranty-pill">'+(a.warrantyEnd&&new Date(a.warrantyEnd)>=new Date()?'Active':'Check')+'</span></div>').join(''):'<p class="empty-note">No household items saved yet. Add your first warranty item.</p>';
+ $('dashboardRecentBills').innerHTML=bills.length?bills.slice().sort((a,b)=>new Date(b.createdAt||b.dueDate)-new Date(a.createdAt||a.dueDate)).slice(0,4).map(b=>'<div class="recent-row"><strong>'+safeHtml(b.provider||b.billType)+'</strong><b>'+moneyFmt(b.amount)+'</b><small>'+fmtDate(b.dueDate)+'</small></div>').join(''):'<p class="empty-note">No bill records yet.</p>';
+ $('dashboardReminders').innerHTML=reminders.length?reminders.slice().sort((a,b)=>new Date(a.remindAt)-new Date(b.remindAt)).slice(0,5).map(r=>'<div class="upcoming-row"><span class="upcoming-symbol">'+(/bill|payment/i.test(r.title)?'₹':/service|vehicle/i.test(r.title)?'🔧':'🔔')+'</span><div><strong>'+safeHtml(r.title)+'</strong><small>Due: '+fmtDate(r.dueAt)+'</small></div></div>').join(''):'<p class="empty-note">'+(token?'No pending reminders yet.':'Sign in to view upcoming reminders.')+'</p>';
+ $('notificationCount').textContent=reminders.length;$('notificationCount').classList.toggle('hidden',reminders.length===0);
+ $('dashMsg').textContent=token?'Showing records saved to your account.':'Sign in to see your personal dashboard and records.';
+ applyUser(currentUser);
+}
 function logout(){
- token='';
- sessionStorage.removeItem('mhw_token');
- badge();
- $('settingsMsg').textContent='Signed out.';
- ['assetCount','vehicleCount','billCount','moneyCount'].forEach(id=>$(id).textContent='—');
- $('dashMsg').textContent='Sign in to view your records.';
+ token='';currentUser=null;sessionStorage.removeItem('mhw_token');sessionStorage.removeItem('mhw_user');
+ dashboardData={assets:[],vehicles:[],bills:[],entries:[],policies:[],reminders:[],requests:[],documents:[]};
+ badge();applyUser(null);$('settingsMsg').textContent='Signed out.';
  ['assetRows','vehicleRows','vehicleEventRows','billRows','moneyRows','requestRows','allTransactionRows','insuranceRows','reminderRows','documentsRows','supportRows'].forEach(id=>{if($(id))$(id).innerHTML='';});
+ renderDashboard();
 }
 function saveBase(){base=$('base').value.trim().replace(/\/$/,'');localStorage.setItem('mhw_base',base);$('settingsMsg').textContent='API URL saved.';badge();}
-function badge(){$('conn').textContent=base?(token?'Signed in · API configured':'API configured · Sign in'):'API not configured';}
+function badge(){$('conn').textContent=base?(token?'● Connected':'○ Sign in to connect'):'API not configured';if($('sidebarStatus'))$('sidebarStatus').textContent=token?'Account connected':'Sign in to connect';if($('securitySession'))$('securitySession').textContent=token?'Signed in':'Signed out';}
 async function api(path,opts={}){if(!base)throw Error('Set API URL in Settings.');let r=await fetch(base+path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opts.headers||{})}});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d;}
 async function loadSiteControl(){try{const d=await api('/v1/admin/site-control');const c=d.control;$('siteVisibility').value=c.visibility;$('maintenanceMode').checked=c.maintenanceMode;$('siteNotice').value=c.notice;$('adminStatus').textContent='Loaded. Current visibility: '+c.visibility+'; maintenance: '+(c.maintenanceMode?'ON':'OFF');}catch(e){$('adminStatus').textContent=e.message+' (SUPER_ADMIN permission required)';}}
 async function saveSiteControl(){try{const d=await api('/v1/admin/site-control',{method:'PATCH',body:JSON.stringify({visibility:$('siteVisibility').value,maintenanceMode:$('maintenanceMode').checked,notice:$('siteNotice').value})});$('adminStatus').textContent='Saved. Visibility: '+d.control.visibility+'; maintenance: '+(d.control.maintenanceMode?'ON':'OFF');}catch(e){$('adminStatus').textContent=e.message;}}
 async function health(){try{let r=await fetch(base+'/health');$('settingsMsg').textContent=JSON.stringify(await r.json());}catch(e){$('settingsMsg').textContent=e.message;}}
-async function registerAccount(e){e.preventDefault();saveBase();try{const name=$('regName').value.trim(),email=$('regEmail').value.trim(),mobile=$('regMobile').value.trim(),password=$('regPassword').value;if(!email&&!mobile)throw Error('Enter an email or mobile number.');const body={name,password,...(email?{email}:{}),...(mobile?{mobile}:{})};const d=await api('/v1/auth/register',{method:'POST',body:JSON.stringify(body)});token=d.token;sessionStorage.setItem('mhw_token',token);badge();$('registerMsg').textContent='Account created and signed in.';refreshAll();}catch(e){$('registerMsg').textContent=e.message;}}
+async function registerAccount(e){e.preventDefault();saveBase();try{const name=$('regName').value.trim(),email=$('regEmail').value.trim(),mobile=$('regMobile').value.trim(),password=$('regPassword').value;if(!email&&!mobile)throw Error('Enter an email or mobile number.');const body={name,password,...(email?{email}:{}),...(mobile?{mobile}:{})};const d=await api('/v1/auth/register',{method:'POST',body:JSON.stringify(body)});token=d.token;sessionStorage.setItem('mhw_token',token);if(d.user){sessionStorage.setItem('mhw_user',JSON.stringify(d.user));applyUser(d.user);}badge();$('registerMsg').textContent='Account created and signed in.';page('dashboard');}catch(e){$('registerMsg').textContent=e.message;}}
 $('registerForm').addEventListener('submit',registerAccount);
-async function login(){saveBase();try{let d=await api('/v1/auth/login',{method:'POST',body:JSON.stringify({login:$('email').value,password:$('password').value})});token=d.token;sessionStorage.setItem('mhw_token',token);badge();$('settingsMsg').textContent='Signed in. Loading your records…';refreshAll();}catch(e){$('settingsMsg').textContent=e.message;}}
+async function login(){saveBase();try{let d=await api('/v1/auth/login',{method:'POST',body:JSON.stringify({login:$('email').value,password:$('password').value})});token=d.token;sessionStorage.setItem('mhw_token',token);if(d.user){sessionStorage.setItem('mhw_user',JSON.stringify(d.user));applyUser(d.user);}badge();$('settingsMsg').textContent='Signed in. Loading your records…';page('dashboard');}catch(e){$('settingsMsg').textContent=e.message;}}
 function dateISO(v){return v?new Date(v+'T00:00:00.000Z').toISOString():undefined}
 function obj(f){let o=Object.fromEntries(new FormData(f));Object.keys(o).forEach(k=>{if(o[k]==='')delete o[k]});return o}
 function table(target,items,fields){if(!items?.length){$(target).innerHTML='<p class="muted">No records yet.</p>';return}$(target).innerHTML='<table><thead><tr>'+fields.map(x=>'<th>'+x[1]+'</th>').join('')+'</tr></thead><tbody>'+items.map(x=>'<tr>'+fields.map(f=>'<td>'+String(x[f[0]]??'—').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</td>').join('')+'</tr>').join('')+'</tbody></table>'}
-async function load(key,path,prop,target,fields){try{let d=await api(path);let a=d[prop]||[];table(target,a,fields||Object.keys(a[0]||{}).slice(0,4).map(k=>[k,k]));return a}catch(e){$(target).textContent=e.message;return []}}
+async function load(key,path,prop,target,fields){try{let d=await api(path);let a=d[prop]||[];if(Object.prototype.hasOwnProperty.call(dashboardData,prop))dashboardData[prop]=a;table(target,a,fields||Object.keys(a[0]||{}).slice(0,4).map(k=>[k,k]));return a}catch(e){if(Object.prototype.hasOwnProperty.call(dashboardData,prop))dashboardData[prop]=[];$(target).textContent=e.message;return []}}
 function bind(formId,path,transform,after){$(formId).addEventListener('submit',async e=>{e.preventDefault();try{let o=obj(e.currentTarget);o=transform?transform(o):o;await api(path,{method:'POST',body:JSON.stringify(o)});e.currentTarget.reset();await after();}catch(err){alert(err.message)}})}
 async function setPaymentTab(tab){const bill=tab==='home'||tab==='card';const money=tab==='given'||tab==='received';$('billPanel').classList.toggle('hidden',!bill);$('moneyPanel').classList.toggle('hidden',!money);$('requestPanel').classList.toggle('hidden',tab!=='requests');$('allTransactionPanel').classList.toggle('hidden',tab!=='all');if(bill){$('billForm').elements.billType.value=tab==='card'?'CREDIT_CARD':'HOME';const d=await api('/v1/bills');const rows=(d.bills||[]).filter(x=>x.billType===(tab==='card'?'CREDIT_CARD':'HOME'));table('billRows',rows,[['billType','Type'],['provider','Provider'],['amount','Amount'],['dueDate','Due date'],['status','Status']]);}if(money){$('moneyForm').elements.direction.value=tab==='received'?'RECEIVED':'GIVEN';const d=await api('/v1/money');const rows=(d.entries||[]).filter(x=>x.direction===(tab==='received'?'RECEIVED':'GIVEN'));table('moneyRows',rows,[['direction','Direction'],['personName','Person'],['amount','Amount'],['balance','Balance'],['status','Status']]);}if(tab==='requests')await load('p','/v1/payment-requests','requests','requestRows',[['recipientName','Recipient'],['amount','Amount'],['purpose','Purpose'],['status','Status']]);if(tab==='all')await loadAllTransactions();}
 async function loadAllTransactions(){try{const [b,m,p]=await Promise.all([api('/v1/bills'),api('/v1/money'),api('/v1/payment-requests')]);const rows=[...(b.bills||[]).map(x=>({...x,transactionType:x.billType,personOrProvider:x.provider||'—',transactionDate:x.dueDate})),...(m.entries||[]).map(x=>({...x,transactionType:x.direction,personOrProvider:x.personName,transactionDate:x.entryDate})),...(p.requests||[]).map(x=>({...x,transactionType:'PAYMENT REQUEST',personOrProvider:x.recipientName,transactionDate:x.createdAt}))].sort((a,b)=>new Date(b.transactionDate)-new Date(a.transactionDate));table('allTransactionRows',rows,[['transactionType','Type'],['personOrProvider','Person / Provider'],['amount','Amount'],['transactionDate','Date'],['status','Status']]);}catch(e){$('allTransactionRows').textContent=e.message;}}
-async function refreshAll(){let [a,v,b,m]=await Promise.all([load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]),load('v','/v1/vehicles','vehicles','vehicleRows',[['nickname','Vehicle'],['makeModel','Model'],['currentOdometer','Odometer']]),load('b','/v1/bills','bills','billRows',[['billType','Type'],['provider','Provider'],['amount','Amount'],['dueDate','Due date'],['status','Status']]),load('m','/v1/money','entries','moneyRows',[['direction','Direction'],['personName','Person'],['amount','Amount'],['balance','Balance'],['status','Status']])]);$('assetCount').textContent=a.length;$('vehicleCount').textContent=v.length;$('billCount').textContent=b.length;$('moneyCount').textContent=m.length;$('dashMsg').textContent='Records fetched from API (if authenticated).'}
+async function refreshAll(){if(!token){renderDashboard();return;}await Promise.all([
+ load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]),
+ load('v','/v1/vehicles','vehicles','vehicleRows',[['nickname','Vehicle'],['makeModel','Model'],['currentOdometer','Odometer']]),
+ load('b','/v1/bills','bills','billRows',[['billType','Type'],['provider','Provider'],['amount','Amount'],['dueDate','Due date'],['status','Status']]),
+ load('m','/v1/money','entries','moneyRows',[['direction','Direction'],['personName','Person'],['amount','Amount'],['balance','Balance'],['status','Status']]),
+ load('i','/v1/insurance','policies','insuranceRows',[['insurer','Insurer'],['policyType','Type'],['endDate','End date'],['premiumDue','Premium due']]),
+ load('documents','/v1/documents','documents','documentsRows',[['originalName','File'],['mimeType','Type'],['sizeBytes','Bytes'],['scanStatus','Scan status']]),
+ load('p','/v1/payment-requests','requests','requestRows',[['recipientName','Recipient'],['amount','Amount'],['purpose','Purpose'],['status','Status']]),
+ loadReminders()
+ ]);renderDashboard();}
 bind('assetForm','/v1/assets',o=>({...o,warrantyEnd:dateISO(o.warrantyEnd)}),()=>load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]));
 async function loadVehicles(){const rows=await load('v','/v1/vehicles','vehicles','vehicleRows',[['nickname','Vehicle'],['makeModel','Model'],['registrationLastFour','Reg. last 4'],['currentOdometer','Odometer']]);const sel=$('eventVehicle');if(sel){const keep=sel.value;sel.innerHTML='<option value="">Select vehicle</option>'+rows.map(v=>'<option value="'+String(v.id).replace(/[^a-zA-Z0-9_-]/g,'')+'">'+String(v.nickname).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</option>').join('');if(rows.some(v=>v.id===keep))sel.value=keep;}await loadVehicleEvents();}
 bind('vehicleForm','/v1/vehicles',o=>({...o,currentOdometer:o.currentOdometer?Number(o.currentOdometer):undefined}),loadVehicles);
@@ -164,8 +219,10 @@ bind('insuranceForm','/v1/insurance',o=>({...o,premiumAmount:o.premiumAmount?Num
 bind('requestForm','/v1/payment-requests',o=>({...o,amount:Number(o.amount)}),()=>load('p','/v1/payment-requests','requests','requestRows',[['recipientName','Recipient'],['amount','Amount'],['purpose','Purpose'],['status','Status']]));
 bind('supportForm','/v1/support/tickets',null,()=>load('s','/v1/support/tickets','tickets','supportRows',[['subject','Subject'],['status','Status'],['createdAt','Created']]));
 bind('reminderForm','/v1/reminders',o=>({...o,dueAt:new Date(o.dueAt).toISOString(),remindAt:new Date(o.remindAt).toISOString()}),loadReminders);
-async function loadReminders(){try{const d=await api('/v1/reminders');const rows=d.reminders||[];const root=$('reminderRows');if(!rows.length){root.innerHTML='<p class="muted">No reminders yet.</p>';return rows;}root.innerHTML=rows.map(r=>{const safe=s=>String(s??'—').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const actions=r.status==='PENDING'?'<button type="button" class="action alt" data-reminder-complete="'+safe(r.id)+'">Complete</button><button type="button" class="action alt" data-reminder-cancel="'+safe(r.id)+'">Cancel</button>':'';return '<article class="tile"><strong>'+safe(r.title)+'</strong><p>'+safe(r.description||'')+'</p><p>Due: '+safe(new Date(r.dueAt).toLocaleString())+'</p><p>Remind: '+safe(new Date(r.remindAt).toLocaleString())+'</p><p>Status: '+safe(r.status)+'</p>'+actions+'</article>';}).join('');root.querySelectorAll('[data-reminder-complete]').forEach(b=>b.addEventListener('click',()=>updateReminder(b.dataset.reminderComplete,'COMPLETED')));root.querySelectorAll('[data-reminder-cancel]').forEach(b=>b.addEventListener('click',()=>updateReminder(b.dataset.reminderCancel,'CANCELLED')));return rows;}catch(e){$('reminderRows').textContent=e.message;return [];}}
+async function loadReminders(){try{const d=await api('/v1/reminders');const rows=d.reminders||[];dashboardData.reminders=rows;const root=$('reminderRows');if(!rows.length){root.innerHTML='<p class="muted">No reminders yet.</p>';return rows;}root.innerHTML=rows.map(r=>{const safe=s=>String(s??'—').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const actions=r.status==='PENDING'?'<button type="button" class="action alt" data-reminder-complete="'+safe(r.id)+'">Complete</button><button type="button" class="action alt" data-reminder-cancel="'+safe(r.id)+'">Cancel</button>':'';return '<article class="tile"><strong>'+safe(r.title)+'</strong><p>'+safe(r.description||'')+'</p><p>Due: '+safe(new Date(r.dueAt).toLocaleString())+'</p><p>Remind: '+safe(new Date(r.remindAt).toLocaleString())+'</p><p>Status: '+safe(r.status)+'</p>'+actions+'</article>';}).join('');root.querySelectorAll('[data-reminder-complete]').forEach(b=>b.addEventListener('click',()=>updateReminder(b.dataset.reminderComplete,'COMPLETED')));root.querySelectorAll('[data-reminder-cancel]').forEach(b=>b.addEventListener('click',()=>updateReminder(b.dataset.reminderCancel,'CANCELLED')));return rows;}catch(e){dashboardData.reminders=[];$('reminderRows').textContent=e.message;return [];}}
 async function updateReminder(id,status){try{await api('/v1/reminders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status})});await loadReminders();}catch(e){alert(e.message);}}
 $('lang').addEventListener('change',e=>setLang(e.target.value));function setLang(l){document.documentElement.lang=l;/* Translation packs are intentionally separate and need native review before full UI coverage. */}
-badge();if(token)refreshAll();
+badge();applyUser(currentUser);if(token)refreshAll();else renderDashboard();
+document.addEventListener('click',e=>{if(!$('addMenu').contains(e.target)&&!e.target.closest('.add-menu-wrap'))$('addMenu').classList.add('hidden');if(!$('profileMenu').contains(e.target)&&!e.target.closest('.profile-button'))$('profileMenu').classList.add('hidden');if(!$('searchResults').contains(e.target)&&!e.target.closest('.global-search'))$('searchResults').classList.add('hidden');});
+
 </script></body></html>
