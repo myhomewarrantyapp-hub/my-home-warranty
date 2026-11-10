@@ -6,6 +6,7 @@ type DeliveryInput = {
   ownerUserId: string;
   reminderId?: string;
   birthdayWishId?: string;
+  moneyEntryId?: string;
   channel: Channel;
   recipient: string;
   subject?: string | null;
@@ -30,9 +31,39 @@ async function enqueue(items: DeliveryInput[]) {
   return result.count;
 }
 
+async function queueDueRecordReminders(now: Date) {
+  const horizon = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+  const [bills, money, vehicleEvents, policies, assets] = await Promise.all([
+    prisma.bill.findMany({ where: { status: "PENDING", dueDate: { lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, billType: true, provider: true, amount: true, dueDate: true } }),
+    prisma.moneyEntry.findMany({ where: { status: "PENDING", balance: { gt: 0 }, dueDate: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, direction: true, personName: true, balance: true, dueDate: true } }),
+    prisma.vehicleEvent.findMany({ where: { nextDueDate: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, eventType: true, nextDueDate: true, vehicle: { select: { nickname: true, makeModel: true } } } }),
+    prisma.insurancePolicy.findMany({ where: { premiumDue: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, insurer: true, policyType: true, premiumAmount: true, premiumDue: true } }),
+    prisma.asset.findMany({ where: { warrantyEnd: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, title: true, category: true, warrantyEnd: true } }),
+  ]);
+  const data: any[] = [];
+  const add = (ownerUserId: string, sourceType: string, sourceId: string, label: string, detail: string, dueValue: Date | null) => {
+    if (!dueValue) return;
+    const dueAt = new Date(dueValue);
+    const remindAt = new Date(Math.max(now.getTime(), dueAt.getTime() - 24 * 60 * 60 * 1000));
+    data.push({
+      ownerUserId, sourceType, sourceId,
+      sourceKey: sourceType + ":" + sourceId + ":" + dueAt.toISOString(),
+      title: label, description: detail,
+      dueAt, remindAt, status: "PENDING", deliveryStatus: "QUEUED",
+    });
+  };
+  for (const bill of bills) add(bill.ownerUserId, "BILL", bill.id, "Bill due: " + (bill.provider || bill.billType), "Amount: ₹" + String(bill.amount), bill.dueDate);
+  for (const entry of money) add(entry.ownerUserId, "MONEY", entry.id, (entry.direction === "GIVEN" ? "Money to receive from " : "Money to repay to ") + entry.personName, "Outstanding balance: ₹" + String(entry.balance), entry.dueDate);
+  for (const event of vehicleEvents) add(event.ownerUserId, "VEHICLE_SERVICE", event.id, "Vehicle due: " + (event.vehicle.nickname || event.vehicle.makeModel || event.eventType), "Next " + event.eventType.toLowerCase() + " due", event.nextDueDate);
+  for (const policy of policies) add(policy.ownerUserId, "INSURANCE", policy.id, "Insurance premium due: " + policy.insurer, policy.policyType + (policy.premiumAmount ? " · ₹" + String(policy.premiumAmount) : ""), policy.premiumDue);
+  for (const asset of assets) add(asset.ownerUserId, "WARRANTY", asset.id, "Warranty ending: " + asset.title, asset.category, asset.warrantyEnd);
+  const created = data.length ? await prisma.reminder.createMany({ data, skipDuplicates: true }) : { count: 0 };
+  return { scanned: bills.length + money.length + vehicleEvents.length + policies.length + assets.length, created: created.count };
+}
+
 async function queueDueReminders(now: Date) {
   const due = await prisma.reminder.findMany({
-    where: { status: "PENDING", remindAt: { lte: now }, deliveryStatus: "QUEUED" },
+    where: { status: "PENDING", remindAt: { lte: now }, deliveryStatus: { in: ["QUEUED", "IN_APP_ONLY"] } },
     include: {
       owner: {
         select: {
@@ -89,6 +120,44 @@ async function queueDueReminders(now: Date) {
     });
   }
   return { scanned: due.length, queued };
+}
+
+async function queueDueMoneyContactReminders(now: Date) {
+  const horizon = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+  const entries = await prisma.moneyEntry.findMany({
+    where: {
+      status: "PENDING", direction: "GIVEN", balance: { gt: 0 },
+      contactReminderEnabled: true, contactReminderConsentAt: { not: null },
+      mobile: { not: null }, dueDate: { not: null, lte: horizon },
+    },
+    take: 200,
+    orderBy: { dueDate: "asc" },
+  });
+  const items: DeliveryInput[] = [];
+  for (const entry of entries) {
+    const dueAt = entry.dueDate!;
+    const scheduledAt = new Date(Math.max(now.getTime(), dueAt.getTime() - 24 * 60 * 60 * 1000));
+    const message = "Hi " + entry.personName + ", this is a friendly reminder about the ₹" + String(entry.balance) + " outstanding amount. The agreed due date is " + dueAt.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) + ". Please contact me if you have already paid. Thank you.";
+    const stamp = dueAt.toISOString();
+    if (entry.contactWhatsAppEnabled && entry.mobile) {
+      items.push({
+        ownerUserId: entry.ownerUserId, moneyEntryId: entry.id,
+        channel: "WHATSAPP", recipient: e164(entry.mobile),
+        subject: "Friendly payment reminder", message, scheduledAt,
+        idempotencyKey: "money-contact/" + entry.id + "/" + stamp + "/WHATSAPP",
+      });
+    }
+    if (entry.contactSmsEnabled && entry.mobile) {
+      items.push({
+        ownerUserId: entry.ownerUserId, moneyEntryId: entry.id,
+        channel: "SMS", recipient: e164(entry.mobile),
+        subject: "Friendly payment reminder", message, scheduledAt,
+        idempotencyKey: "money-contact/" + entry.id + "/" + stamp + "/SMS",
+      });
+    }
+  }
+  const queued = await enqueue(items);
+  return { scanned: entries.length, queued };
 }
 
 async function queueDueBirthdays(now: Date) {
@@ -309,7 +378,9 @@ export async function dispatchDueNotifications() {
       data: { status: "QUEUED", nextAttemptAt: now, lastError: null },
     });
   }
+  const autoReminders = await queueDueRecordReminders(now);
   const reminders = await queueDueReminders(now);
+  const moneyContactReminders = await queueDueMoneyContactReminders(now);
   const birthdays = await queueDueBirthdays(now);
   const queued = await prisma.notificationDelivery.findMany({
     where: { status: "QUEUED", nextAttemptAt: { lte: now } },
@@ -353,5 +424,5 @@ export async function dispatchDueNotifications() {
   }
 
   await finishBirthdayWishes();
-  return { reminders, birthdays, attempted: queued.length, sent, retried, failed };
+  return { autoReminders, reminders, moneyContactReminders, birthdays, attempted: queued.length, sent, retried, failed };
 }
