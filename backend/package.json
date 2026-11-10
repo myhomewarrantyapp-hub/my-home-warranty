@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:promote-admin": "tsx src/scripts/promote-super-admin.ts"
+    "db:promote-admin": "tsx src/scripts/promote-super-admin.ts",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsc"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
