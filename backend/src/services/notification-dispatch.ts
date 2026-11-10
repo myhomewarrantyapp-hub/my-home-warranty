@@ -296,7 +296,7 @@ async function sendWhatsApp(delivery: { recipient: string; subject: string | nul
   const template = delivery.birthdayWishId
     ? (process.env.WHATSAPP_WISH_TEMPLATE_NAME || "mhw_scheduled_wish")
     : (process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder");
-    const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\ /\$/g,"");
+  const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replaceAll("/", "");
   const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
   if (!token || !phoneId) {
     throw new Error("WhatsApp is not configured. Add the Meta Cloud API access token and phone number ID in Vercel.");
