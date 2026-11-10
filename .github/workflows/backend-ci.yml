@@ -77,6 +77,12 @@ jobs:
           node - <<'NODE'
           const base = 'https://my-home-warranty-api.vercel.app';
           const origin = 'https://myhomewarrantyapp-hub.github.io';
+          const pagesUrl = origin + '/my-home-warranty/';
+          const pagesResponse = await fetch(pagesUrl);
+          const pagesHtml = await pagesResponse.text();
+          if (!pagesResponse.ok || !pagesHtml.includes('My Home Warranty') || !pagesHtml.includes(base)) {
+            throw new Error('GitHub Pages frontend is not serving the latest app: ' + pagesResponse.status);
+          }
           async function json(path, init) {
             const response = await fetch(base + path, init);
             const body = await response.json().catch(() => ({}));
@@ -105,6 +111,7 @@ jobs:
           if (protectedRoute.response.status !== 401) {
             throw new Error('Unauthenticated records route should return 401, got ' + protectedRoute.response.status);
           }
+          console.log('GitHub Pages frontend: PASS (' + pagesUrl + ')');
           console.log('Production health: PASS');
           console.log('Supabase-backed site status: PASS');
           console.log('GitHub Pages CORS preflight: PASS');
