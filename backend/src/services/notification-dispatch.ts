@@ -36,7 +36,7 @@ async function queueDueRecordReminders(now: Date) {
   const [bills, money, vehicleEvents, policies, assets] = await Promise.all([
     prisma.bill.findMany({ where: { status: "PENDING", dueDate: { lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, billType: true, provider: true, amount: true, dueDate: true } }),
     prisma.moneyEntry.findMany({ where: { status: "PENDING", balance: { gt: 0 }, dueDate: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, direction: true, personName: true, balance: true, dueDate: true } }),
-    prisma.vehicleEvent.findMany({ where: { nextDueDate: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, eventType: true, nextDueDate: true, vehicle: { select: { nickname: true, makeModel: true } } } }),
+    prisma.vehicleEvent.findMany({ where: { nextDueDate: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, eventType: true, nextDueDate: true, nextDueOdometer: true, vehicle: { select: { nickname: true, makeModel: true, currentOdometer: true } } } }),
     prisma.insurancePolicy.findMany({ where: { premiumDue: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, insurer: true, policyType: true, premiumAmount: true, premiumDue: true } }),
     prisma.asset.findMany({ where: { warrantyEnd: { not: null, lte: horizon } }, take: 500, select: { id: true, ownerUserId: true, title: true, category: true, warrantyEnd: true } }),
   ]);
@@ -54,7 +54,19 @@ async function queueDueRecordReminders(now: Date) {
   };
   for (const bill of bills) add(bill.ownerUserId, "BILL", bill.id, "Bill due: " + (bill.provider || bill.billType), "Amount: ₹" + String(bill.amount), bill.dueDate);
   for (const entry of money) add(entry.ownerUserId, "MONEY", entry.id, (entry.direction === "GIVEN" ? "Money to receive from " : "Money to repay to ") + entry.personName, "Outstanding balance: ₹" + String(entry.balance), entry.dueDate);
-  for (const event of vehicleEvents) add(event.ownerUserId, "VEHICLE_SERVICE", event.id, "Vehicle due: " + (event.vehicle.nickname || event.vehicle.makeModel || event.eventType), "Next " + event.eventType.toLowerCase() + " due", event.nextDueDate);
+  for (const event of vehicleEvents) {
+    const vehicleLabel = event.vehicle.nickname || event.vehicle.makeModel || event.eventType;
+    add(event.ownerUserId, "VEHICLE_SERVICE", event.id, "Vehicle due: " + vehicleLabel, "Next " + event.eventType.toLowerCase() + " service", event.nextDueDate);
+    if (event.nextDueOdometer !== null && event.vehicle.currentOdometer !== null && event.vehicle.currentOdometer >= event.nextDueOdometer) {
+      data.push({
+        ownerUserId: event.ownerUserId, sourceType: "VEHICLE_ODOMETER", sourceId: event.id,
+        sourceKey: "VEHICLE_ODOMETER:" + event.id + ":" + event.nextDueOdometer,
+        title: "Vehicle service odometer due: " + vehicleLabel,
+        description: "Current odometer " + event.vehicle.currentOdometer + " km · Service due at " + event.nextDueOdometer + " km",
+        dueAt: now, remindAt: now, status: "PENDING", deliveryStatus: "QUEUED",
+      });
+    }
+  }
   for (const policy of policies) add(policy.ownerUserId, "INSURANCE", policy.id, "Insurance premium due: " + policy.insurer, policy.policyType + (policy.premiumAmount ? " · ₹" + String(policy.premiumAmount) : ""), policy.premiumDue);
   for (const asset of assets) add(asset.ownerUserId, "WARRANTY", asset.id, "Warranty ending: " + asset.title, asset.category, asset.warrantyEnd);
   const created = data.length ? await prisma.reminder.createMany({ data, skipDuplicates: true }) : { count: 0 };
