@@ -12,7 +12,7 @@ const specs:any={
  "payment-requests":{model:"paymentRequest",list:"requests",create:z.object({recipientName:z.string().min(1).max(120),recipientMobile:z.string().regex(/^[6-9][0-9]{9}$/).optional(),amount:z.number().positive(),purpose:z.string().max(300).optional()}),fields:["recipientName","recipientMobile","amount","purpose"]},
  "support/tickets":{model:"supportTicket",list:"tickets",create:z.object({subject:z.string().min(3).max(160),message:z.string().min(5).max(4000)}),fields:["subject","message"]}
 };
-for(const [path,s] of Object.entries(specs)){
+for(const [path,s] of Object.entries(specs) as [string, any][]){
  router.get("/"+path,authenticate,async(req:AuthRequest,res)=>{try{const rows=await (prisma as any)[s.model].findMany({where:{ownerUserId:req.userId},orderBy:{createdAt:"desc"},take:200});res.json({[s.list]:rows});}catch{res.status(500).json({error:"Could not load records"});}});
  router.post("/"+path,authenticate,async(req:AuthRequest,res)=>{try{const v=s.create.parse(req.body);const data:any={ownerUserId:req.userId};for(const k of s.fields)if(v[k]!==undefined)data[k]=["warrantyEnd","dueDate","entryDate","startDate","endDate","premiumDue"].includes(k)?new Date(v[k]):v[k];const row=await (prisma as any)[s.model].create({data});res.status(201).json({record:row});}catch(e){res.status(400).json({error:e instanceof Error?e.message:"Invalid record"});}});
 }
