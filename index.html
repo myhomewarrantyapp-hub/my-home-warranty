@@ -164,7 +164,7 @@
   </aside>
 </div></body><script>
 const $=id=>document.getElementById(id);let token=sessionStorage.getItem('mhw_token')||'';let base=localStorage.getItem('mhw_base')||'https://my-home-warranty-api.vercel.app';$('base').value=base;
-let dashboardData={assets:[],vehicles:[],bills:[],entries:[],policies:[],reminders:[],requests:[],documents:[]};
+let dashboardData={assets:[],vehicles:[],bills:[],entries:[],policies:[],reminders:[],requests:[],documents:[],wishes:[]};
 let currentUser=null;try{currentUser=JSON.parse(sessionStorage.getItem('mhw_user')||'null')}catch{}
 const moneyFmt=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0});
 const safeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -177,6 +177,9 @@ function page(id){
  $('dashboardAside').classList.toggle('hidden',id!=='dashboard');
  if($('sidebar'))$('sidebar').classList.remove('open');
  if(id==='dashboard'){if(token)refreshAll();else renderDashboard();return;}
+ if(id==='family'){if(token)loadBirthdayWishes();else $('birthdayWishRows').textContent='Sign in to schedule birthday wishes.';return;}
+ if(id==='notifications'){if(token)loadNotificationHistory();else $('notificationHistoryRows').textContent='Sign in to view message history.';return;}
+ if(id==='settings'){if(token){loadNotificationPreferences();loadProviderConfiguration();}return;}
  if(!token){if(id==='settings')return;const targets={assets:'assetRows',vehicles:'vehicleRows',payments:'billRows',insurance:'insuranceRows',reminders:'reminderRows',documents:'documentsRows',support:'supportRows'};if(targets[id]&&$(targets[id]))$(targets[id]).textContent='Sign in to view and manage your private records.';return;}
  if(id==='assets')load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]);
  if(id==='vehicles')loadVehicles();
@@ -223,12 +226,14 @@ function renderDashboard(){
  $('dashboardRecentBills').innerHTML=bills.length?bills.slice().sort((a,b)=>new Date(b.createdAt||b.dueDate)-new Date(a.createdAt||a.dueDate)).slice(0,4).map(b=>'<div class="recent-row"><strong>'+safeHtml(b.provider||b.billType)+'</strong><b>'+moneyFmt(b.amount)+'</b><small>'+fmtDate(b.dueDate)+'</small></div>').join(''):'<p class="empty-note">No bill records yet.</p>';
  $('dashboardReminders').innerHTML=reminders.length?reminders.slice().sort((a,b)=>new Date(a.remindAt)-new Date(b.remindAt)).slice(0,5).map(r=>'<div class="upcoming-row"><span class="upcoming-symbol">'+(/bill|payment/i.test(r.title)?'₹':/service|vehicle/i.test(r.title)?'🔧':'🔔')+'</span><div><strong>'+safeHtml(r.title)+'</strong><small>Due: '+fmtDate(r.dueAt)+'</small></div></div>').join(''):'<p class="empty-note">'+(token?'No pending reminders yet.':'Sign in to view upcoming reminders.')+'</p>';
  $('notificationCount').textContent=reminders.length;$('notificationCount').classList.toggle('hidden',reminders.length===0);
+ const wishes=(d.wishes||[]).filter(w=>w.status==='SCHEDULED').sort((a,b)=>new Date(a.scheduledAt)-new Date(b.scheduledAt)).slice(0,3);
+ $('dashboardBirthdays').innerHTML=wishes.length?wishes.map(w=>'<div class="upcoming-row"><span class="upcoming-symbol">🎂</span><div><strong>'+safeHtml(w.recipientName)+'</strong><small>Wish scheduled: '+fmtDate(w.scheduledAt)+'</small></div></div>').join(''):'<div class="placeholder-side"><div class="placeholder-avatar">🎁</div><div><strong>No scheduled wishes</strong><p>Schedule a birthday wish with a photo or video.</p><button class="text-link" onclick="page(\'family\')">Schedule now →</button></div></div>';
  $('dashMsg').textContent=token?'Showing records saved to your account.':'Sign in to see your personal dashboard and records.';
  applyUser(currentUser);
 }
 function logout(){
  token='';currentUser=null;sessionStorage.removeItem('mhw_token');sessionStorage.removeItem('mhw_user');
- dashboardData={assets:[],vehicles:[],bills:[],entries:[],policies:[],reminders:[],requests:[],documents:[]};
+ dashboardData={assets:[],vehicles:[],bills:[],entries:[],policies:[],reminders:[],requests:[],documents:[],wishes:[]};
  badge();applyUser(null);$('settingsMsg').textContent='Signed out.';
  ['assetRows','vehicleRows','vehicleEventRows','billRows','moneyRows','requestRows','allTransactionRows','insuranceRows','reminderRows','documentsRows','supportRows'].forEach(id=>{if($(id))$(id).innerHTML='';});
  renderDashboard();
@@ -257,7 +262,8 @@ async function refreshAll(){if(!token){renderDashboard();return;}await Promise.a
  load('i','/v1/insurance','policies','insuranceRows',[['insurer','Insurer'],['policyType','Type'],['endDate','End date'],['premiumDue','Premium due']]),
  load('documents','/v1/documents','documents','documentsRows',[['originalName','File'],['mimeType','Type'],['sizeBytes','Bytes'],['scanStatus','Scan status']]),
  load('p','/v1/payment-requests','requests','requestRows',[['recipientName','Recipient'],['amount','Amount'],['purpose','Purpose'],['status','Status']]),
- loadReminders()
+ loadReminders(),
+ load('w','/v1/birthday-wishes','wishes','birthdayWishRows',[])
  ]);renderDashboard();}
 bind('assetForm','/v1/assets',o=>({...o,warrantyEnd:dateISO(o.warrantyEnd)}),()=>load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]));
 async function loadVehicles(){const rows=await load('v','/v1/vehicles','vehicles','vehicleRows',[['nickname','Vehicle'],['makeModel','Model'],['registrationLastFour','Reg. last 4'],['currentOdometer','Odometer']]);const sel=$('eventVehicle');if(sel){const keep=sel.value;sel.innerHTML='<option value="">Select vehicle</option>'+rows.map(v=>'<option value="'+String(v.id).replace(/[^a-zA-Z0-9_-]/g,'')+'">'+String(v.nickname).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</option>').join('');if(rows.some(v=>v.id===keep))sel.value=keep;}await loadVehicleEvents();}
@@ -272,8 +278,81 @@ bind('supportForm','/v1/support/tickets',null,()=>load('s','/v1/support/tickets'
 bind('reminderForm','/v1/reminders',o=>({...o,dueAt:new Date(o.dueAt).toISOString(),remindAt:new Date(o.remindAt).toISOString()}),loadReminders);
 async function loadReminders(){try{const d=await api('/v1/reminders');const rows=d.reminders||[];dashboardData.reminders=rows;const root=$('reminderRows');if(!rows.length){root.innerHTML='<p class="muted">No reminders yet.</p>';return rows;}root.innerHTML=rows.map(r=>{const safe=s=>String(s??'—').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const actions=r.status==='PENDING'?'<button type="button" class="action alt" data-reminder-complete="'+safe(r.id)+'">Complete</button><button type="button" class="action alt" data-reminder-cancel="'+safe(r.id)+'">Cancel</button>':'';return '<article class="tile"><strong>'+safe(r.title)+'</strong><p>'+safe(r.description||'')+'</p><p>Due: '+safe(new Date(r.dueAt).toLocaleString())+'</p><p>Remind: '+safe(new Date(r.remindAt).toLocaleString())+'</p><p>Status: '+safe(r.status)+'</p>'+actions+'</article>';}).join('');root.querySelectorAll('[data-reminder-complete]').forEach(b=>b.addEventListener('click',()=>updateReminder(b.dataset.reminderComplete,'COMPLETED')));root.querySelectorAll('[data-reminder-cancel]').forEach(b=>b.addEventListener('click',()=>updateReminder(b.dataset.reminderCancel,'CANCELLED')));return rows;}catch(e){dashboardData.reminders=[];$('reminderRows').textContent=e.message;return [];}}
 async function updateReminder(id,status){try{await api('/v1/reminders/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status})});await loadReminders();}catch(e){alert(e.message);}}
+async function loadBirthdayWishes(){
+ try{
+  const d=await api('/v1/birthday-wishes');dashboardData.wishes=d.wishes||[];
+  const root=$('birthdayWishRows');
+  if(!dashboardData.wishes.length){root.innerHTML='<p class="empty-note">No scheduled wishes yet. Create one above; nothing will be sent before the date and time you choose.</p>';renderDashboard();return dashboardData.wishes;}
+  root.innerHTML=dashboardData.wishes.map(w=>{
+   const channels=[w.whatsappEnabled?'WhatsApp':'',w.emailEnabled?'Email':'',w.smsEnabled?'SMS':''].filter(Boolean);
+   const delivery=(w.deliveries||[]).map(x=>safeHtml(x.channel)+': '+safeHtml(x.status)+(x.lastError?' — '+safeHtml(x.lastError):'')).join('<br>');
+   return '<div class="birthday-wish-row"><div><strong>🎂 '+safeHtml(w.recipientName)+'</strong><small>Birth date: '+fmtDate(w.birthDate)+' · Scheduled: '+fmtDate(w.scheduledAt)+'</small><small>'+safeHtml(w.mediaOriginalName||'No photo/video attached')+'</small><div class="wish-channel-tags">'+channels.map(x=>'<span>'+safeHtml(x)+'</span>').join('')+'</div>'+(w.deliveryNote?'<small>'+safeHtml(w.deliveryNote)+'</small>':'')+(delivery?'<small>'+delivery+'</small>':'')+'</div><div class="wish-actions"><span class="wish-status '+(w.status==='SCHEDULED'?'scheduled':w.status==='FAILED'?'failed':'')+'">'+safeHtml(w.status)+'</span>'+(w.status==='SCHEDULED'?'<br><button type="button" onclick="cancelBirthdayWish(\''+safeHtml(w.id)+'\')">Cancel</button>':'')+'</div></div>';
+  }).join('');
+  renderDashboard();return dashboardData.wishes;
+ }catch(e){$('birthdayWishRows').textContent=e.message;return [];}
+}
+async function submitBirthdayWish(event){
+ event.preventDefault();
+ if(!token){$('birthdayWishStatus').textContent='Sign in before scheduling a birthday wish.';return;}
+ const form=event.currentTarget,fd=new FormData(form),raw=Object.fromEntries(fd.entries()),file=$('birthdayMedia').files?.[0];
+ const selected={whatsappEnabled:form.elements.whatsappEnabled.checked,smsEnabled:form.elements.smsEnabled.checked,emailEnabled:form.elements.emailEnabled.checked};
+ const consent={whatsappConsent:form.elements.whatsappConsent.checked,smsConsent:form.elements.smsConsent.checked,emailConsent:form.elements.emailConsent.checked};
+ try{
+  if(!raw.scheduledAt||new Date(raw.scheduledAt).getTime()<=Date.now())throw Error('Choose a future date and time. The wish will not be sent early.');
+  if(file){
+   const allowed=['image/jpeg','image/png','image/webp','video/mp4','video/webm'];
+   if(!allowed.includes(file.type))throw Error('Choose JPG, PNG, WEBP, MP4 or WEBM.');
+   const limit=file.type.startsWith('video/')?100*1024*1024:12*1024*1024;
+   if(file.size>limit)throw Error('This file is over the allowed size.');
+  }
+  const payload={
+   recipientName:String(raw.recipientName||'').trim(),
+   ...(raw.recipientMobile?{recipientMobile:String(raw.recipientMobile).trim()}:{}),
+   ...(raw.recipientEmail?{recipientEmail:String(raw.recipientEmail).trim()}:{}),
+   birthDate:raw.birthDate,
+   scheduledAt:new Date(raw.scheduledAt).toISOString(),
+   timezone:raw.timezone||'Asia/Kolkata',
+   ...(raw.message?{message:String(raw.message).trim()}:{}),
+   recurringYearly:form.elements.recurringYearly.checked,
+   ...selected,...consent
+  };
+  $('birthdayWishStatus').textContent='Saving your scheduled wish…';
+  const created=await api('/v1/birthday-wishes',{method:'POST',body:JSON.stringify(payload)});
+  const wish=created.wish;
+  if(file){
+   $('birthdayWishStatus').textContent='Preparing a private upload link…';
+   const signed=await api('/v1/birthday-wishes/'+encodeURIComponent(wish.id)+'/media-upload-url',{method:'POST',body:JSON.stringify({originalName:file.name,contentType:file.type,sizeBytes:file.size})});
+   $('birthdayWishStatus').textContent='Uploading your '+(file.type.startsWith('video/')?'video':'photo')+' privately…';
+   const uploaded=await fetch(signed.presignedUrl,{method:'PUT',headers:{'Content-Type':file.type},body:file});
+   if(!uploaded.ok)throw Error('Private media upload failed (HTTP '+uploaded.status+'). Your birthday schedule is saved; you can cancel it or retry with a new wish.');
+   await api('/v1/birthday-wishes/'+encodeURIComponent(wish.id)+'/media-complete',{method:'POST',body:JSON.stringify({pathname:signed.pathname,originalName:file.name,contentType:file.type})});
+  }
+  form.reset();
+  $('birthdayWishStatus').textContent='Saved! This is a surprise: nothing is sent before '+new Date(payload.scheduledAt).toLocaleString('en-IN',{timeZone:payload.timezone})+'. Message provider setup will be checked at send time.';
+  await loadBirthdayWishes();
+ }catch(error){$('birthdayWishStatus').textContent=error.message||'Unable to schedule this birthday wish.';}
+}
+async function cancelBirthdayWish(id){if(!confirm('Cancel this scheduled birthday wish?'))return;try{await api('/v1/birthday-wishes/'+encodeURIComponent(id),{method:'PATCH',body:JSON.stringify({status:'CANCELLED'})});await loadBirthdayWishes();}catch(e){alert(e.message);}}
+async function loadNotificationPreferences(){
+ try{const d=await api('/v1/notifications/preferences');const p=d.preferences||{};$('prefEmail').checked=p.emailEnabled;$('prefWhatsapp').checked=p.whatsappEnabled;$('prefSms').checked=p.smsEnabled;$('notificationPreferenceStatus').textContent='Your current reminder preferences are loaded.';}catch(e){$('notificationPreferenceStatus').textContent=e.message;}
+}
+async function saveNotificationPreferences(){
+ try{const d=await api('/v1/notifications/preferences',{method:'PATCH',body:JSON.stringify({emailEnabled:$('prefEmail').checked,whatsappEnabled:$('prefWhatsapp').checked,smsEnabled:$('prefSms').checked})});const p=d.preferences||{};$('notificationPreferenceStatus').textContent='Saved. Email: '+(p.emailEnabled?'ON':'OFF')+' · WhatsApp: '+(p.whatsappEnabled?'ON':'OFF')+' · SMS: '+(p.smsEnabled?'ON':'OFF')+'. Actual delivery starts after providers are configured.';}catch(e){$('notificationPreferenceStatus').textContent=e.message;}
+}
+async function loadProviderConfiguration(){
+ try{const d=await api('/v1/notifications/configuration');const p=d.providers||{};const items=[['Email',p.email],['WhatsApp',p.whatsapp],['SMS',p.sms],['Scheduler',p.scheduler]];$('providerStatusGrid').innerHTML=items.map(x=>'<div class="provider-status"><b>'+x[0]+'</b><small class="'+(x[1]?'status-on':'status-off')+'">'+(x[1]?'Configured':'Needs setup')+'</small></div>').join('');}catch(e){$('providerStatusGrid').textContent=e.message;}
+}
+async function loadNotificationHistory(){
+ try{const d=await api('/v1/notifications/deliveries'),rows=d.deliveries||[];const root=$('notificationHistoryRows');if(!rows.length){root.innerHTML='<p class="empty-note">No messages queued yet.</p>';return rows;}
+ root.innerHTML=rows.map(x=>'<div class="notification-row"><div><strong>'+safeHtml(x.channel)+'</strong><small>'+safeHtml(x.recipient)+'</small></div><div><strong>'+safeHtml(x.subject||'Notification')+'</strong><small>Scheduled: '+fmtDate(x.scheduledAt)+' · Attempts: '+safeHtml(x.attempts)+'</small>'+(x.lastError?'<small>'+safeHtml(x.lastError)+'</small>':'')+'</div><span class="delivery-state '+(x.status==='SENT'?'sent':x.status==='FAILED'?'failed':'')+'">'+safeHtml(x.status)+'</span></div>').join('');
+ return rows;
+ }catch(e){$('notificationHistoryRows').textContent=e.message;return [];}
+}
+
 $('lang').addEventListener('change',e=>setLang(e.target.value));function setLang(l){document.documentElement.lang=l;/* Translation packs are intentionally separate and need native review before full UI coverage. */}
-badge();applyUser(currentUser);if(token)refreshAll();else renderDashboard();
+badge();applyUser(currentUser);
+$('birthdayWishForm').addEventListener('submit',submitBirthdayWish);
+if(token)refreshAll();else renderDashboard();
 document.addEventListener('click',e=>{if(!$('addMenu').contains(e.target)&&!e.target.closest('.add-menu-wrap'))$('addMenu').classList.add('hidden');if(!$('profileMenu').contains(e.target)&&!e.target.closest('.profile-button'))$('profileMenu').classList.add('hidden');if(!$('searchResults').contains(e.target)&&!e.target.closest('.global-search'))$('searchResults').classList.add('hidden');});
 
 </script></body></html>
