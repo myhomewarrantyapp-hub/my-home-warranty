@@ -1,0 +1,163 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [phase19-admin-controls]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "index.html"
+      - "translations/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+permissions:
+  contents: read
+  pages: read
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mhw_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mhw_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx prisma validate
+      - name: Apply versioned migrations to temporary PostgreSQL
+        run: npx prisma migrate deploy
+      - name: Confirm migration state
+        run: npx prisma migrate status
+      - run: npx prisma generate
+      - run: npm run build
+      - name: Validate frontend JavaScript
+        working-directory: .
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+          for (const file of ['frontend/index.html', 'index.html']) {
+            const html = fs.readFileSync(file, 'utf8');
+            const begin = html.indexOf('<script>');
+            const finish = html.indexOf('</script>', begin);
+            if (begin < 0 || finish < 0) throw new Error('Inline application script not found in ' + file);
+            const out = '/tmp/' + file.replace(/[^a-z0-9]/gi, '-') + '.js';
+            fs.writeFileSync(out, html.slice(begin + 8, finish));
+            cp.execFileSync('node', ['--check', out], {stdio: 'inherit'});
+            console.log('Validated ' + file);
+          }
+          NODE
+      - name: Validate translation JSON
+        working-directory: .
+        run: node -e "JSON.parse(require('fs').readFileSync('translations/te.json','utf8')); console.log('Telugu translation JSON valid')"
+      - name: Inspect GitHub Pages publishing settings
+        working-directory: .
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          (async () => {
+            const response = await fetch('https://api.github.com/repos/myhomewarrantyapp-hub/my-home-warranty/pages', {
+              headers: {
+                Authorization: 'Bearer ' + process.env.GITHUB_TOKEN,
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+              }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              console.log('Pages settings API unavailable: HTTP ' + response.status);
+              return;
+            }
+            console.log('Published Pages URL: ' + (data.html_url || '(not returned)'));
+            console.log('Pages build type: ' + (data.build_type || '(not returned)'));
+            console.log('Pages source: ' + JSON.stringify(data.source || null));
+            if (data.html_url) {
+              fs.appendFileSync(process.env.GITHUB_ENV, 'GITHUB_PAGES_URL=' + data.html_url + '\n');
+            }
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+      - name: Smoke test live production API and browser CORS
+        working-directory: .
+        run: |
+          node - <<'NODE'
+          const base = 'https://my-home-warranty-api.vercel.app';
+          const origin = 'https://myhomewarrantyapp-hub.github.io';
+          const pagesCandidates = [...new Set([process.env.GITHUB_PAGES_URL, origin + '/my-home-warranty/', origin + '/'].filter(Boolean))];
+          let pagesUrl = '';
+          for (let attempt = 0; attempt < 12 && !pagesUrl; attempt++) {
+            for (const candidate of pagesCandidates) {
+              const response = await fetch(candidate);
+              const html = await response.text();
+              const titleStart = html.indexOf('<title');
+              const titleEnd = titleStart >= 0 ? html.indexOf('>', titleStart) : -1;
+              const title = titleEnd >= 0 ? html.slice(titleStart, titleEnd + 1) : '(no title)';
+              console.log('Pages candidate ' + candidate + ': HTTP ' + response.status + ', title=' + title);
+              if (response.ok && html.includes('My Home Warranty') && html.includes(base)) {
+                pagesUrl = candidate;
+                break;
+              }
+            }
+            if (!pagesUrl && attempt < 11) await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          if (!pagesUrl) throw new Error('GitHub Pages did not publish the latest app HTML within the verification window.');
+          async function json(path, init) {
+            const response = await fetch(base + path, init);
+            const body = await response.json().catch(() => ({}));
+            return { response, body };
+          }
+          const health = await json('/health');
+          if (health.response.status !== 200 || health.body.status !== 'ok') {
+            throw new Error('Production health check failed: ' + health.response.status);
+          }
+          const site = await json('/v1/site-status', {headers: {Origin: origin}});
+          if (site.response.status !== 200 || site.body.visibility !== 'PUBLIC' || site.body.maintenanceMode !== false) {
+            throw new Error('Production site-status check failed: ' + site.response.status);
+          }
+          const preflight = await fetch(base + '/v1/assets', {
+            method: 'OPTIONS',
+            headers: {
+              Origin: origin,
+              'Access-Control-Request-Method': 'GET',
+              'Access-Control-Request-Headers': 'authorization,content-type'
+            }
+          });
+          if (preflight.status !== 204 || preflight.headers.get('access-control-allow-origin') !== origin) {
+            throw new Error('GitHub Pages CORS preflight failed: ' + preflight.status);
+          }
+          const protectedRoute = await json('/v1/vehicles', {headers: {Origin: origin}});
+          if (protectedRoute.response.status !== 401) {
+            throw new Error('Unauthenticated records route should return 401, got ' + protectedRoute.response.status);
+          }
+          console.log('GitHub Pages frontend: PASS (' + pagesUrl + ')');
+          console.log('Production health: PASS');
+          console.log('Supabase-backed site status: PASS');
+          console.log('GitHub Pages CORS preflight: PASS');
+          console.log('Unauthenticated records protection: PASS');
+          NODE
