@@ -15,7 +15,21 @@ app.use(express.json({limit:"100kb"}));
 app.use(rateLimit({windowMs:60_000,limit:100,standardHeaders:true,legacyHeaders:false}));
 app.get("/health",(_req,res)=>res.json({status:"ok",service:"My Home Warranty API"}));
 app.get("/v1/site-status",async(_req,res)=>{try{const c=await prisma.siteControl.findUnique({where:{id:"main"}});res.setHeader("Cache-Control","no-store");res.json({visibility:c?.visibility||"PUBLIC",maintenanceMode:c?.maintenanceMode||false,notice:c?.notice||"The website is temporarily unavailable. Please try again later."});}catch{res.status(503).json({error:"Site status unavailable"});}});
-app.use("/v1",async(req,res,next)=>{if(req.path.startsWith("/auth/")||req.path==="/admin/site-control"||req.path.startsWith("/admin/site-control/"))return next();try{const c=await prisma.siteControl.findUnique({where:{id:"main"}});if(c&&(c.visibility==="PRIVATE"||c.maintenanceMode))return res.status(503).json({error:c.notice||"Service temporarily unavailable"});next();}catch{res.status(503).json({error:"Service temporarily unavailable"});}},routes);
+app.use("/v1",async(req,res,next)=>{
+  // The cron dispatcher has its own constant-time CRON_SECRET check.
+  // It must continue delivering already-scheduled reminders during website maintenance
+  // and should not depend on an extra SiteControl database lookup.
+  if(req.path==="/notifications/dispatch"&&req.method==="POST")return next();
+  if(req.path.startsWith("/auth/")||req.path==="/admin/site-control"||req.path.startsWith("/admin/site-control/"))return next();
+  try{
+    const c=await prisma.siteControl.findUnique({where:{id:"main"}});
+    if(c&&(c.visibility==="PRIVATE"||c.maintenanceMode))return res.status(503).json({error:c.notice||"Service temporarily unavailable"});
+    next();
+  }catch(error){
+    console.error("Site visibility middleware failed:",error);
+    res.status(503).json({error:"Service temporarily unavailable"});
+  }
+},routes);
 app.use((_req,res)=>res.status(404).json({error:"Endpoint not found"}));
 export default app;
 
