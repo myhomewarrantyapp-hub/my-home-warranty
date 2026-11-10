@@ -10,22 +10,23 @@ This is an active work-in-progress on `phase19-admin-controls`. The `main` branc
 - Owner-scoped create/list routes for assets, vehicles, bills, money entries, insurance policies, payment requests, and support tickets.
 - Document metadata listing; actual private file upload/download and malware scanning are not implemented.
 - Basic frontend screens for the main modules.
-- A GitHub Actions workflow validates the Prisma schema, generates the client, compiles the backend, checks frontend JavaScript syntax, and parses the Telugu translation JSON.
+- Payments & Money contains Home Bills, Credit Card Bills, Money Given, Money Received, Payment Requests, and All Transactions; bill and money tabs filter their own record types.
+- Reminder UI supports creating, listing, completing, and cancelling owner-scoped reminders. Reminder delivery is not yet scheduled/pushed automatically; this is an in-app record workflow only.
+- Vehicle maintenance history API and UI support service/repair/insurance/PUC/tyre/other events, dates, odometer, cost, notes, and next-due details, with vehicle ownership checks.
+- A GitHub Actions workflow starts a temporary PostgreSQL 16 service, applies and checks the versioned Prisma migration, validates/generates the Prisma client, compiles the backend, checks frontend JavaScript syntax, and parses the Telugu translation JSON.
 - A Vercel serverless entry point and routing configuration are included under `backend/api/` and `backend/vercel.json`.
 
 ## Not production-ready
-CI previously passed dependency installation, Prisma validation/generation, TypeScript build, frontend JavaScript syntax, and Telugu translation JSON parsing on the earlier code state. An initial versioned PostgreSQL migration matching the current Prisma models has now been added under `backend/prisma/migrations/20261110090000_init/`; its CI run is pending. No database connection, backend host, JWT secret, CORS origin, private storage bucket, or SUPER_ADMIN account has been configured. The Vercel configuration is source-only and has not been deployed or smoke-tested. The frontend's API URL and full user workflows still need integration testing. Do not enter real customer data or expose this API as a production application yet.
+CI has passed on the latest frontend, vehicle-history, and reminder changes, including PostgreSQL 16 migration deployment/status checks, Prisma validation/generation, TypeScript build, frontend JavaScript syntax, and Telugu translation JSON parsing. No database connection, backend host, JWT secret, CORS origin, private storage bucket, or SUPER_ADMIN account has been configured. The Vercel configuration is source-only and has not been deployed or smoke-tested. The frontend's API URL and full user workflows still need integration testing. Do not enter real customer data or expose this API as a production application yet.
 
 ## Required next steps
-1. Confirm the GitHub Actions Prisma validation and TypeScript build pass; fix all reported errors.
-2. Validate the initial migration in CI, then apply and test it against a non-production PostgreSQL database.
-3. Complete frontend/API integration, including reliable date handling, record listing, editing/deletion, dashboard counts, reminders, and all 23 translations.
-4. Implement private document upload/download, access controls, file validation, and malware scanning.
-5. Add automated unit/integration tests and complete a security review (including session handling, rate limits, CORS, and admin bootstrap).
-6. Deploy the `backend/` folder as a Vercel project on its free Hobby tier if eligible, and configure `DATABASE_URL`, `JWT_SECRET` (at least 32 random characters), and `CORS_ORIGIN` in Vercel environment variables. Never commit secrets or send them in chat.
-7. Configure Supabase PostgreSQL and apply reviewed Prisma migrations before using registration or records. Do not use `prisma db push` against a live database without a verified backup.
-8. Deploy to staging, verify critical workflows, backups, and restore procedures, then consider production.
-9. Keep `main` unchanged until the owner reviews and explicitly approves a pull request.
+1. Complete frontend/API integration, including reliable date handling, record editing/deletion, dashboard counts, and all 23 translations.
+2. Implement private document upload/download, access controls, file validation, and malware scanning.
+3. Add automated unit/integration tests and complete a security review (including session handling, rate limits, CORS, and admin bootstrap).
+4. Deploy the `backend/` folder as a Vercel project on its free Hobby tier if eligible, and configure `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` (at least 32 random characters), and `CORS_ORIGIN` in Vercel environment variables. Never commit secrets or send them in chat.
+5. Configure Supabase PostgreSQL and apply reviewed Prisma migrations before using registration or records. Do not use `prisma db push` against a live database without a verified backup.
+6. Deploy to staging, verify critical workflows, backups, and restore procedures, then consider production.
+7. Keep `main` unchanged until the owner reviews and explicitly approves a pull request.
 
 ## Supabase PostgreSQL setup (owner action required)
 
@@ -33,7 +34,7 @@ The initial Prisma migration is committed at `backend/prisma/migrations/20261110
 
 To connect the real Supabase database safely:
 1. Open the Supabase project dashboard and select **Project Settings → Database → Connection string**. Use the URI connection string and require SSL. Prefer the Supabase pooler/session-compatible URI if deploying on serverless; follow the dashboard's current recommendation.
-2. In the Vercel project settings for the backend, set `DATABASE_URL` to that connection URI and set `JWT_SECRET` to a newly generated random value of at least 32 characters. Set `CORS_ORIGIN` to the exact deployed frontend origin. Never put these values in GitHub source, commits, screenshots, or chat.
+2. In the Vercel project settings for the backend, set `DATABASE_URL` to the Supabase Transaction Pooler URI (port 6543, with the pooler options recommended by Supabase), and `DIRECT_URL` to the Session Pooler URI (port 5432) for Prisma migrations. Set `JWT_SECRET` to a newly generated random value of at least 32 characters and `CORS_ORIGIN` to the exact deployed frontend origin. Never put these values in GitHub source, commits, screenshots, or chat.
 3. Set the Vercel project root to `backend`. Configure the build command to run `npm run db:generate && npm run db:migrate && npm run build` (Prisma migration deploy is versioned and repeatable). Deploy first to a private/staging environment and verify the build logs show the migration applied.
 4. If Vercel build logs report a database connectivity issue, stop and correct the connection string/network mode in the dashboard; do not paste the password into chat.
 5. After the first successful migration, create a normal account through the app, then use the documented admin-promotion procedure from a secure trusted environment to grant SUPER_ADMIN. Do not expose a public admin bootstrap endpoint.
