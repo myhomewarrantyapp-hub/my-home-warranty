@@ -7,6 +7,9 @@ CREATE TABLE "NotificationPreference" (
   "emailEnabled" BOOLEAN NOT NULL DEFAULT false,
   "whatsappEnabled" BOOLEAN NOT NULL DEFAULT false,
   "smsEnabled" BOOLEAN NOT NULL DEFAULT false,
+  "emailConsentAt" TIMESTAMP(3),
+  "whatsappConsentAt" TIMESTAMP(3),
+  "smsConsentAt" TIMESTAMP(3),
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "NotificationPreference_pkey" PRIMARY KEY ("id")
 );
@@ -28,6 +31,9 @@ CREATE TABLE "BirthdayWish" (
   "whatsappConsent" BOOLEAN NOT NULL DEFAULT false,
   "smsConsent" BOOLEAN NOT NULL DEFAULT false,
   "emailConsent" BOOLEAN NOT NULL DEFAULT false,
+  "whatsappConsentAt" TIMESTAMP(3),
+  "smsConsentAt" TIMESTAMP(3),
+  "emailConsentAt" TIMESTAMP(3),
   "mediaPath" TEXT,
   "mediaContentType" TEXT,
   "mediaOriginalName" TEXT,
