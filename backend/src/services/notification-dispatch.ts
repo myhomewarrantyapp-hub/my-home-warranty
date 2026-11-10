@@ -263,7 +263,7 @@ async function finishBirthdayWishes() {
   });
   for (const wish of processing) {
     const deliveries = await prisma.notificationDelivery.findMany({ where: { birthdayWishId: wish.id } });
-    if (!deliveries.length || deliveries.some((item) => item.status === "QUEUED" || item.status === "SENDING")) continue;
+    if (!deliveries.length || deliveries.some((item) => item.status === "QUEUED" || item.status === "SENDING" || item.status === "BLOCKED")) continue;
     const failed = deliveries.filter((item) => item.status !== "SENT");
     if (failed.length) {
       await prisma.birthdayWish.update({
@@ -292,8 +292,22 @@ async function finishBirthdayWishes() {
   }
 }
 
+function channelIsConfigured(channel: string) {
+  if (channel === "EMAIL") return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+  if (channel === "WHATSAPP") return Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_TEMPLATE_NAME && process.env.WHATSAPP_API_VERSION);
+  if (channel === "SMS") return Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER);
+  return false;
+}
+
 export async function dispatchDueNotifications() {
   const now = new Date();
+  const readyChannels = (["EMAIL", "WHATSAPP", "SMS"] as const).filter(channelIsConfigured);
+  if (readyChannels.length) {
+    await prisma.notificationDelivery.updateMany({
+      where: { status: "BLOCKED", channel: { in: [...readyChannels] } },
+      data: { status: "QUEUED", nextAttemptAt: now, lastError: null },
+    });
+  }
   const reminders = await queueDueReminders(now);
   const birthdays = await queueDueBirthdays(now);
   const queued = await prisma.notificationDelivery.findMany({
@@ -321,16 +335,19 @@ export async function dispatchDueNotifications() {
       sent++;
     } catch (error) {
       const message = (error instanceof Error ? error.message : "Delivery failed").slice(0, 900);
-      const terminal = attempt >= 4;
+      const missingProviderConfig = message.toLowerCase().includes("not configured");
+      const terminal = !missingProviderConfig && attempt >= 4;
       await prisma.notificationDelivery.update({
         where: { id: item.id },
         data: {
-          status: terminal ? "FAILED" : "QUEUED",
-          nextAttemptAt: new Date(Date.now() + [5, 30, 120, 0][attempt - 1] * 60_000),
+          status: missingProviderConfig ? "BLOCKED" : terminal ? "FAILED" : "QUEUED",
+          nextAttemptAt: new Date(Date.now() + (missingProviderConfig ? 24 * 60 : [5, 30, 120, 0][attempt - 1]) * 60_000),
           lastError: message,
         },
       });
-      if (terminal) failed++; else retried++;
+      if (missingProviderConfig) retried++;
+      else if (terminal) failed++;
+      else retried++;
     }
   }
 
