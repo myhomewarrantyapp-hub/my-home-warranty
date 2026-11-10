@@ -59,10 +59,11 @@ jobs:
           const cp = require('child_process');
           for (const file of ['frontend/index.html', 'index.html']) {
             const html = fs.readFileSync(file, 'utf8');
-            const match = html.match(/<script>([\\s\\S]*?)<\\/script>/);
-            if (!match) throw new Error('Inline application script not found in ' + file);
+            const begin = html.indexOf('<script>');
+            const finish = html.indexOf('</script>', begin);
+            if (begin < 0 || finish < 0) throw new Error('Inline application script not found in ' + file);
             const out = '/tmp/' + file.replace(/[^a-z0-9]/gi, '-') + '.js';
-            fs.writeFileSync(out, match[1]);
+            fs.writeFileSync(out, html.slice(begin + 8, finish));
             cp.execFileSync('node', ['--check', out], {stdio: 'inherit'});
             console.log('Validated ' + file);
           }
