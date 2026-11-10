@@ -14,11 +14,11 @@ This is an active work-in-progress on `phase19-admin-controls`. The `main` branc
 - A Vercel serverless entry point and routing configuration are included under `backend/api/` and `backend/vercel.json`.
 
 ## Not production-ready
-No successful CI run, dependency install, TypeScript build, database migration, integration test, security review, or production deployment has yet been confirmed. No database connection, backend host, JWT secret, CORS origin, private storage bucket, or SUPER_ADMIN account has been configured. The Vercel configuration is source-only and has not been deployed or smoke-tested. The frontend's API URL and full user workflows still need integration testing. Do not enter real customer data or expose this API as a production application yet.
+CI previously passed dependency installation, Prisma validation/generation, TypeScript build, frontend JavaScript syntax, and Telugu translation JSON parsing on the earlier code state. An initial versioned PostgreSQL migration matching the current Prisma models has now been added under `backend/prisma/migrations/20261110090000_init/`; its CI run is pending. No database connection, backend host, JWT secret, CORS origin, private storage bucket, or SUPER_ADMIN account has been configured. The Vercel configuration is source-only and has not been deployed or smoke-tested. The frontend's API URL and full user workflows still need integration testing. Do not enter real customer data or expose this API as a production application yet.
 
 ## Required next steps
 1. Confirm the GitHub Actions Prisma validation and TypeScript build pass; fix all reported errors.
-2. Create and test versioned PostgreSQL migrations against a non-production database.
+2. Validate the initial migration in CI, then apply and test it against a non-production PostgreSQL database.
 3. Complete frontend/API integration, including reliable date handling, record listing, editing/deletion, dashboard counts, reminders, and all 23 translations.
 4. Implement private document upload/download, access controls, file validation, and malware scanning.
 5. Add automated unit/integration tests and complete a security review (including session handling, rate limits, CORS, and admin bootstrap).
