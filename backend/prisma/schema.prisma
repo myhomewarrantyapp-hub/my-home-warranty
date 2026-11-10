@@ -37,6 +37,7 @@ model User {
  insurancePolicies InsurancePolicy[]
  documents Document[]
  reminders Reminder[]
+ notificationDeliveries NotificationDelivery[]
  auditAsActor AuditEvent[] @relation("AuditActor")
  supportTickets SupportTicket[]
  notificationPreference NotificationPreference?
@@ -258,6 +259,7 @@ model NotificationDelivery {
  ownerUserId String
  reminderId String?
  birthdayWishId String?
+ moneyEntryId String?
  channel String
  recipient String
  subject String?
@@ -275,8 +277,10 @@ model NotificationDelivery {
  owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
  reminder Reminder? @relation(fields:[reminderId],references:[id],onDelete:Cascade)
  birthdayWish BirthdayWish? @relation(fields:[birthdayWishId],references:[id],onDelete:Cascade)
+ moneyEntry MoneyEntry? @relation(fields:[moneyEntryId],references:[id],onDelete:Cascade)
  @@index([status,nextAttemptAt])
  @@index([ownerUserId,createdAt])
  @@index([reminderId])
  @@index([birthdayWishId])
+ @@index([moneyEntryId])
 }
