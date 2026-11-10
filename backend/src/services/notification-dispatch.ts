@@ -277,11 +277,16 @@ async function sendEmail(delivery: { recipient: string; subject: string | null; 
 async function sendWhatsApp(delivery: { recipient: string; subject: string | null; message: string; idempotencyKey: string }) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const template = process.env.WHATSAPP_TEMPLATE_NAME;
-  const version = process.env.WHATSAPP_API_VERSION;
-  const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en";
-  if (!token || !phoneId || !template || !version) {
-    throw new Error("WhatsApp is not configured. Add the Meta Cloud API token, phone number ID, API version and approved template name.");
+  const template = delivery.birthdayWishId
+    ? (process.env.WHATSAPP_BIRTHDAY_TEMPLATE_NAME || "mhw_birthday_wish")
+    : (process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder");
+  const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\\/?|\\/$/g, "");
+  const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
+  if (!token || !phoneId) {
+    throw new Error("WhatsApp is not configured. Add the Meta Cloud API access token and phone number ID in Vercel.");
+  }
+  if (!/^v\\d+\\.\\d+$/.test(version)) {
+    throw new Error("WHATSAPP_API_VERSION must look like v26.0.");
   }
   const response = await fetch("https://graph.facebook.com/" + version.replace(/^\/?/, "") + "/" + phoneId + "/messages", {
     method: "POST",
