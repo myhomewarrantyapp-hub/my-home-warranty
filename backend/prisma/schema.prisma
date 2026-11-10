@@ -80,6 +80,7 @@ model VehicleEvent {
  createdAt DateTime @default(now())
  vehicle Vehicle @relation(fields:[vehicleId],references:[id],onDelete:Cascade)
  @@index([ownerUserId,vehicleId,eventDate])
+ @@index([vehicleId])
 }
 model Bill {
  id String @id @default(cuid())
