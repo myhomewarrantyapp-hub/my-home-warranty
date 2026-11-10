@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "index.html"
       - "translations/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
@@ -53,8 +54,19 @@ jobs:
       - name: Validate frontend JavaScript
         working-directory: .
         run: |
-          node -e "const fs=require('fs'); const html=fs.readFileSync('frontend/index.html','utf8'); const match=html.match(/<script>([\\s\\S]*?)<\\/script>/); if(!match) throw new Error('Inline application script not found'); fs.writeFileSync('/tmp/mhw-frontend.js',match[1]);"
-          node --check /tmp/mhw-frontend.js
+          node - <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+          for (const file of ['frontend/index.html', 'index.html']) {
+            const html = fs.readFileSync(file, 'utf8');
+            const match = html.match(/<script>([\\s\\S]*?)<\\/script>/);
+            if (!match) throw new Error('Inline application script not found in ' + file);
+            const out = '/tmp/' + file.replace(/[^a-z0-9]/gi, '-') + '.js';
+            fs.writeFileSync(out, match[1]);
+            cp.execFileSync('node', ['--check', out], {stdio: 'inherit'});
+            console.log('Validated ' + file);
+          }
+          NODE
       - name: Validate translation JSON
         working-directory: .
         run: node -e "JSON.parse(require('fs').readFileSync('translations/te.json','utf8')); console.log('Telugu translation JSON valid')"
