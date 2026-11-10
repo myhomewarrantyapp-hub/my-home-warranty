@@ -87,6 +87,10 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
   });
   try {
     const v = schema.parse(req.body);
+    if (new Date(v.scheduledAt).getTime() <= Date.now()) {
+      return res.status(400).json({ error: "Choose a future date and time so the birthday wish remains a surprise." });
+    }
+    const now = new Date();
     const wish = await prisma.birthdayWish.create({
       data: {
         ownerUserId: req.userId!,
@@ -104,6 +108,9 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
         whatsappConsent: v.whatsappConsent,
         smsConsent: v.smsConsent,
         emailConsent: v.emailConsent,
+        whatsappConsentAt: v.whatsappConsent ? now : null,
+        smsConsentAt: v.smsConsent ? now : null,
+        emailConsentAt: v.emailConsent ? now : null,
         status: "SCHEDULED",
       },
     });
