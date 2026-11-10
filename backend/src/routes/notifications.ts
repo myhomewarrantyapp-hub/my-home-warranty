@@ -148,7 +148,7 @@ router.post("/whatsapp/test", authenticate, async (req: AuthRequest, res) => {
     if (!user?.mobile) {
       return res.status(400).json({ error: "Add your own mobile number to this account before sending a test." });
     }
-    const digits = user.mobile.replace(/\\D/g, "");
+    const digits = user.mobile.split("").filter((character) => character >= "0" && character <= "9").join("");
     const recipient = /^91[6-9]\\d{9}$/.test(digits) ? digits : /^[6-9]\\d{9}$/.test(digits) ? "91" + digits : "";
     if (!recipient) return res.status(400).json({ error: "The account mobile number is not a valid Indian mobile number." });
     const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replaceAll("/", "");
@@ -189,6 +189,80 @@ router.post("/whatsapp/test", authenticate, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send WhatsApp test." });
+  }
+});
+
+// Sends one email test only to the signed-in account's own email address.
+router.post("/email/test", authenticate, async (req: AuthRequest, res) => {
+  try {
+    z.object({ confirmSend: z.literal(true) }).parse(req.body);
+    const key = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM_EMAIL;
+    if (!key || !from) {
+      return res.status(409).json({ error: "Email setup is incomplete. Add RESEND_API_KEY and RESEND_FROM_EMAIL in Vercel." });
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { email: true } });
+    if (!user?.email) return res.status(400).json({ error: "Add your own email address to your account before testing." });
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + key,
+        "Content-Type": "application/json",
+        "Idempotency-Key": "mhw-email-test-" + req.userId + "-" + Date.now(),
+      },
+      body: JSON.stringify({
+        from, to: [user.email],
+        subject: "My Home Warranty — Email connection test",
+        text: "Your My Home Warranty email notification connection is working.",
+      }),
+    });
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return res.status(502).json({ error: String(data.message || "Email provider rejected the test.").slice(0, 350) });
+    }
+    res.json({ success: true, message: "Email provider accepted the test request.", providerMessageId: String(data.id || "") });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send email test." });
+  }
+});
+
+// Sends one SMS only to the signed-in account's own mobile number.
+// For India, the sender must complete the required DLT entity/header/template setup.
+router.post("/sms/test", authenticate, async (req: AuthRequest, res) => {
+  try {
+    z.object({ confirmSend: z.literal(true) }).parse(req.body);
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const auth = process.env.TWILIO_AUTH_TOKEN;
+    const from = process.env.TWILIO_FROM_NUMBER;
+    if (!sid || !auth || !from) {
+      return res.status(409).json({ error: "SMS setup is incomplete. Add the Twilio Account SID, Auth Token and registered sender number in Vercel." });
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { mobile: true } });
+    if (!user?.mobile) return res.status(400).json({ error: "Add your own mobile number to your account before testing." });
+    const digits = user.mobile.split("").filter((character) => character >= "0" && character <= "9").join("");
+    const recipient = digits.length === 10 ? "+91" + digits : digits.length === 12 && digits.startsWith("91") ? "+" + digits : "";
+    if (!recipient) return res.status(400).json({ error: "The account mobile number is not a valid Indian mobile number." });
+
+    const form = new URLSearchParams({
+      To: recipient,
+      From: from,
+      Body: "My Home Warranty SMS test: your notification connection is working.",
+    });
+    const response = await fetch("https://api.twilio.com/2010-04-01/Accounts/" + sid + "/Messages.json", {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(sid + ":" + auth).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: form,
+    });
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return res.status(502).json({ error: String(data.message || "SMS provider rejected the test.").slice(0, 350) });
+    }
+    res.json({ success: true, message: "SMS provider accepted the test request.", providerMessageId: String(data.sid || "") });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Unable to send SMS test." });
   }
 });
 
