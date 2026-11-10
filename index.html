@@ -91,7 +91,7 @@
        <div class="money-box receive"><small>Money Given · Balance</small><strong id="moneyGivenBalance">₹0</strong><span id="moneyGivenCount">0 records</span></div>
        <div class="money-box repay"><small>Money Received · Balance</small><strong id="moneyReceivedBalance">₹0</strong><span id="moneyReceivedCount">0 records</span></div>
       </div><button class="wide-soft-button" onclick="page('payments');setPaymentTab('requests')">↗　Send Payment Request</button></article>
-    <article class="dash-card wishes-card"><div class="card-heading"><div><span class="heading-icon">🎁</span><h2>Birthday Wishes</h2></div><span class="coming-tag">Schedule</span></div><div class="wish-content"><div class="wish-icon">🎁</div><div><strong>Send a birthday wish with photo or video</strong><p>Choose channels, schedule date and time, and repeat yearly.</p></div></div><button class="wide-outline-button" onclick="page('family')">＋ Schedule Birthday Wish</button></article>
+    <article class="dash-card wishes-card"><div class="card-heading"><div><span class="heading-icon">🎁</span><h2>Wishes & Greetings</h2></div><span class="coming-tag">Schedule</span></div><div class="wish-content"><div class="wish-icon">🎁</div><div><strong>Send any special wish with photo or video</strong><p>Choose channels, schedule date and time, and repeat yearly.</p></div></div><button class="wide-outline-button" onclick="page('family')">＋ Schedule Birthday Wish</button></article>
   </div>
   <div class="bottom-features">
     <div><span>🔒</span><b>Secure Login</b><small>Account password and sign-in</small></div><div><span>🔔</span><b>Smart Reminders</b><small>Bills, service and warranties</small></div><div><span>◉</span><b>WhatsApp & Email</b><small>Not connected yet</small></div><div><span>▥</span><b>Reports & Analytics</b><small>Summary of your records</small></div><div><span>♧</span><b>Family Access</b><small>Setup not completed</small></div>
@@ -127,20 +127,21 @@
 </section>
 <section id="admin" class="hidden"><h2>Admin controls · Website visibility</h2><p class="muted">Only the SUPER_ADMIN account can change these controls. They block the app API; the hosting platform may still serve the static website shell.</p><div id="adminStatus" class="msg">Sign in as SUPER_ADMIN to load controls.</div><label>Website visibility</label><select id="siteVisibility"><option value="PUBLIC">Public – users can access the app</option><option value="PRIVATE">Private – block app access</option></select><label><input id="maintenanceMode" type="checkbox" style="width:auto"> Maintenance mode – temporarily block app access</label><label>Message shown to users</label><textarea id="siteNotice" maxlength="240">The website is temporarily unavailable. Please try again later.</textarea><button class="action" onclick="loadSiteControl()">Load current setting</button><button class="action" onclick="saveSiteControl()">Save website controls</button><p class="warn">For complete removal from the public internet/search results, the owner must also disable GitHub Pages or make the repository private. This setting alone cannot unpublish a hosting platform.</p></section>
 <section id="family" class="module-page hidden">
-  <div class="page-title-row"><div><span class="eyebrow">FAMILY MOMENTS</span><h2>Birthday Wishes</h2><p class="muted">Schedule a personal birthday message with a photo or video in advance.</p></div><span class="coming-tag">Private media storage</span></div>
-  <div class="birthday-intro"><div class="birthday-intro-icon">🎁</div><div><strong>Make their day special</strong><p>Choose a delivery date, write your message, and attach one photo or video. Media is stored privately and the share link expires after 7 days.</p></div></div>
+  <div class="page-title-row"><div><span class="eyebrow">SPECIAL MOMENTS</span><h2>Wishes & Greetings</h2><p class="muted">Schedule birthday, anniversary, festival and any special wishes with a photo or video.</p></div><span class="coming-tag">Private media storage</span></div>
+  <div class="birthday-intro"><div class="birthday-intro-icon">🎁</div><div><strong>Make every occasion special</strong><p>Birthday, anniversary, festival, congratulations, housewarming or your own custom occasion. Choose the date and time, add a message and attach a photo or video. Media stays private until the scheduled wish is sent.</p></div></div>
   <div class="dash-card birthday-form-card">
-    <h3>＋ Schedule a Birthday Wish</h3>
+    <h3>＋ Schedule a Wish</h3>
     <form id="birthdayWishForm">
       <div class="main-content form birthday-form-grid">
-        <div><label>Person's name</label><input name="recipientName" required maxlength="120" placeholder="e.g. Amma"></div>
+        <div><label>Occasion type</label><select name="wishType" id="wishType"><option value="BIRTHDAY">Birthday</option><option value="ANNIVERSARY">Anniversary</option><option value="FESTIVAL">Festival</option><option value="CONGRATULATIONS">Congratulations</option><option value="HOUSEWARMING">Housewarming</option><option value="CUSTOM">Other / Custom wish</option></select></div>
+        <div><label>Person's name / Recipient</label><input name="recipientName" required maxlength="120" placeholder="e.g. Amma"></div>
         <div><label>Mobile number (for WhatsApp / SMS)</label><input name="recipientMobile" inputmode="tel" placeholder="+91 98765 43210 or 10-digit mobile"></div>
         <div><label>Email address</label><input name="recipientEmail" type="email" placeholder="name@example.com"></div>
-        <div><label>Date of birth</label><input name="birthDate" type="date" required></div>
+        <div><label>Birthday date (only for Birthday)</label><input name="birthDate" id="wishBirthDate" type="date"></div>
         <div><label>Schedule wish for</label><input name="scheduledAt" type="datetime-local" required></div>
         <div><label>Time zone</label><select name="timezone"><option value="Asia/Kolkata" selected>India – Asia/Kolkata</option><option value="UTC">UTC</option></select></div>
       </div>
-      <label>Personal birthday message</label><textarea name="message" rows="3" maxlength="1200" placeholder="Write a warm birthday wish…"></textarea>
+      <label>Personal message (optional)</label><textarea name="message" rows="3" maxlength="1200" placeholder="Write a warm birthday wish…"></textarea>
       <h4 class="form-subheading">Choose delivery channels and confirm permission</h4>
       <div class="consent-grid">
         <label class="consent-option"><span><b>WhatsApp</b><small>Send a template message</small></span><input name="whatsappEnabled" type="checkbox"></label>
@@ -150,12 +151,12 @@
         <label class="consent-option"><span><b>Email</b><small>Send message and media link</small></span><input name="emailEnabled" type="checkbox"></label>
         <label class="consent-option"><span><b>Recipient opted in to Email</b><small>Required before sending</small></span><input name="emailConsent" type="checkbox"></label>
       </div>
-      <label class="consent-option repeat-option"><span><b>Repeat every year</b><small>Schedule next year's wish after this one is successfully sent</small></span><input name="recurringYearly" type="checkbox"></label>
+      <label class="consent-option repeat-option"><span><b>Repeat every year</b><small>For birthdays, anniversaries and other yearly occasions</small></span><input name="recurringYearly" type="checkbox"></label>
       <label>Attach one photo or video (optional)</label>
       <input id="birthdayMedia" name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm">
       <p class="muted">Images up to 12 MB · Videos up to 100 MB · JPG, PNG, WEBP, MP4 or WEBM.</p>
-      <button class="action" type="submit">Schedule Birthday Wish</button>
-      <div id="birthdayWishStatus" class="msg">Your wish will be queued for the date and time you select. Provider credentials are required for actual message delivery.</div>
+      <button class="action" type="submit">Schedule Wish</button>
+      <div id="birthdayWishStatus" class="msg">Choose any occasion. Nothing will be sent before your selected date and time. Provider credentials are required for actual message delivery.</div>
     </form>
   </div>
   <div class="dash-card birthday-list-card"><div class="card-heading"><div><span class="heading-icon">🎂</span><h2>Your Scheduled Wishes</h2></div><button class="text-link" onclick="loadBirthdayWishes()">Refresh</button></div><div id="birthdayWishRows"><p class="empty-note">Sign in to view scheduled birthday wishes.</p></div></div>
@@ -292,7 +293,7 @@ async function loadBirthdayWishes(){
   root.innerHTML=dashboardData.wishes.map(w=>{
    const channels=[w.whatsappEnabled?'WhatsApp':'',w.emailEnabled?'Email':'',w.smsEnabled?'SMS':''].filter(Boolean);
    const delivery=(w.deliveries||[]).map(x=>safeHtml(x.channel)+': '+safeHtml(x.status)+(x.lastError?' — '+safeHtml(x.lastError):'')).join('<br>');
-   return '<div class="birthday-wish-row"><div><strong>🎂 '+safeHtml(w.recipientName)+'</strong><small>Birth date: '+fmtDate(w.birthDate)+' · Scheduled: '+fmtDate(w.scheduledAt)+'</small><small>'+safeHtml(w.mediaOriginalName||'No photo/video attached')+'</small><div class="wish-channel-tags">'+channels.map(x=>'<span>'+safeHtml(x)+'</span>').join('')+'</div>'+(w.deliveryNote?'<small>'+safeHtml(w.deliveryNote)+'</small>':'')+(delivery?'<small>'+delivery+'</small>':'')+'</div><div class="wish-actions"><span class="wish-status '+(w.status==='SCHEDULED'?'scheduled':w.status==='FAILED'?'failed':'')+'">'+safeHtml(w.status)+'</span>'+(w.status==='SCHEDULED'?'<br><button type="button" onclick="cancelBirthdayWish(\''+safeHtml(w.id)+'\')">Cancel</button>':'')+'</div></div>';
+   return '<div class="birthday-wish-row"><div><strong>🎂 '+safeHtml(w.recipientName)+'</strong><small>'+safeHtml(({BIRTHDAY:'Birthday',ANNIVERSARY:'Anniversary',FESTIVAL:'Festival',CONGRATULATIONS:'Congratulations',HOUSEWARMING:'Housewarming',CUSTOM:'Custom wish'})[w.wishType]||'Special wish')+' · Scheduled: '+fmtDate(w.scheduledAt)+'</small><small>'+safeHtml(w.mediaOriginalName||'No photo/video attached')+'</small><div class="wish-channel-tags">'+channels.map(x=>'<span>'+safeHtml(x)+'</span>').join('')+'</div>'+(w.deliveryNote?'<small>'+safeHtml(w.deliveryNote)+'</small>':'')+(delivery?'<small>'+delivery+'</small>':'')+'</div><div class="wish-actions"><span class="wish-status '+(w.status==='SCHEDULED'?'scheduled':w.status==='FAILED'?'failed':'')+'">'+safeHtml(w.status)+'</span>'+(w.status==='SCHEDULED'?'<br><button type="button" onclick="cancelBirthdayWish(\''+safeHtml(w.id)+'\')">Cancel</button>':'')+'</div></div>';
   }).join('');
   renderDashboard();return dashboardData.wishes;
  }catch(e){$('birthdayWishRows').textContent=e.message;return [];}
@@ -315,7 +316,8 @@ async function submitBirthdayWish(event){
    recipientName:String(raw.recipientName||'').trim(),
    ...(raw.recipientMobile?{recipientMobile:String(raw.recipientMobile).trim()}:{}),
    ...(raw.recipientEmail?{recipientEmail:String(raw.recipientEmail).trim()}:{}),
-   birthDate:raw.birthDate,
+   wishType:raw.wishType||'BIRTHDAY',
+   ...(raw.birthDate?{birthDate:raw.birthDate}:{}),
    scheduledAt:new Date(raw.scheduledAt).toISOString(),
    timezone:raw.timezone||'Asia/Kolkata',
    ...(raw.message?{message:String(raw.message).trim()}:{}),
@@ -334,7 +336,7 @@ async function submitBirthdayWish(event){
    await api('/v1/birthday-wishes/'+encodeURIComponent(wish.id)+'/media-complete',{method:'POST',body:JSON.stringify({pathname:signed.pathname,originalName:file.name,contentType:file.type})});
   }
   form.reset();
-  $('birthdayWishStatus').textContent='Saved! This is a surprise: nothing is sent before '+new Date(payload.scheduledAt).toLocaleString('en-IN',{timeZone:payload.timezone})+'. Message provider setup will be checked at send time.';
+  $('birthdayWishStatus').textContent='Your '+(raw.wishType||'BIRTHDAY').toLowerCase().replace('_',' ')+' wish is saved! Nothing is sent before '+new Date(payload.scheduledAt).toLocaleString('en-IN',{timeZone:payload.timezone})+'. Message provider setup will be checked at send time.';
   await loadBirthdayWishes();
  }catch(error){$('birthdayWishStatus').textContent=error.message||'Unable to schedule this birthday wish.';}
 }
@@ -358,6 +360,8 @@ async function loadNotificationHistory(){
 $('lang').addEventListener('change',e=>setLang(e.target.value));function setLang(l){document.documentElement.lang=l;/* Translation packs are intentionally separate and need native review before full UI coverage. */}
 badge();applyUser(currentUser);
 $('birthdayWishForm').addEventListener('submit',submitBirthdayWish);
+$('wishType').addEventListener('change',e=>{$('wishBirthDate').required=e.target.value==='BIRTHDAY';$('wishBirthDate').closest('div').style.opacity=e.target.value==='BIRTHDAY'?'1':'.55';});
+$('wishBirthDate').required=$('wishType').value==='BIRTHDAY';
 if(token)refreshAll();else renderDashboard();
 document.addEventListener('click',e=>{if(!$('addMenu').contains(e.target)&&!e.target.closest('.add-menu-wrap'))$('addMenu').classList.add('hidden');if(!$('profileMenu').contains(e.target)&&!e.target.closest('.profile-button'))$('profileMenu').classList.add('hidden');if(!$('searchResults').contains(e.target)&&!e.target.closest('.global-search'))$('searchResults').classList.add('hidden');});
 
