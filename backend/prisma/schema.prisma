@@ -37,7 +37,6 @@ model User {
  insurancePolicies InsurancePolicy[]
  documents Document[]
  reminders Reminder[]
- notificationDeliveries NotificationDelivery[]
  auditAsActor AuditEvent[] @relation("AuditActor")
  supportTickets SupportTicket[]
  notificationPreference NotificationPreference?
@@ -169,6 +168,9 @@ model Reminder {
  remindAt DateTime
  status RecordStatus @default(PENDING)
  deliveryStatus String @default("QUEUED")
+ sourceType String?
+ sourceId String?
+ sourceKey String? @unique
  createdAt DateTime @default(now())
  owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
  deliveries NotificationDelivery[]
