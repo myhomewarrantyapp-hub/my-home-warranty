@@ -74,9 +74,9 @@ router.patch("/preferences", authenticate, async (req: AuthRequest, res: Respons
       },
       update: {
         ...v,
-        emailConsentAt: v.emailEnabled && !old?.emailConsentAt ? now : old?.emailConsentAt,
-        whatsappConsentAt: v.whatsappEnabled && !old?.whatsappConsentAt ? now : old?.whatsappConsentAt,
-        smsConsentAt: v.smsEnabled && !old?.smsConsentAt ? now : old?.smsConsentAt,
+        emailConsentAt: v.emailEnabled ? (old?.emailEnabled ? old.emailConsentAt : now) : null,
+        whatsappConsentAt: v.whatsappEnabled ? (old?.whatsappEnabled ? old.whatsappConsentAt : now) : null,
+        smsConsentAt: v.smsEnabled ? (old?.smsEnabled ? old.smsConsentAt : now) : null,
       },
     });
     res.json({
