@@ -24,6 +24,7 @@
 .birthday-intro{display:flex;align-items:center;gap:13px;background:linear-gradient(120deg,#fff4fa,#f3e9ff);border:1px solid #eedcf2;border-radius:13px;padding:14px;margin-bottom:12px}.birthday-intro-icon{width:48px;height:48px;border-radius:14px;background:#fff;display:grid;place-items:center;font-size:26px;flex:none}.birthday-intro strong{font-size:13px;color:#3b2852}.birthday-intro p{font-size:10px;color:#746580;margin:4px 0 0;line-height:1.4}.birthday-form-card,.birthday-list-card{margin-bottom:12px}.birthday-form-card h3{margin:0 0 12px}.birthday-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.form-subheading{font-size:12px;color:#1a3858;margin:16px 0 8px}.consent-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:9px 0}.consent-option{display:flex!important;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e1eaf3;background:#f9fbfe;border-radius:10px;padding:10px;margin:0!important;min-height:54px}.consent-option b{font-size:10px;color:#173451;display:block}.consent-option small{display:block;font-size:8px;color:#6c7d90;font-weight:400;margin-top:3px}.consent-option input{width:18px!important;height:18px;accent-color:#1769b7;flex:none}.repeat-option{margin-top:9px!important}.notification-preferences{max-width:650px}.provider-status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:12px}.provider-status{background:#f6f9fc;border:1px solid #e3ebf3;border-radius:9px;padding:10px}.provider-status b{display:block;font-size:10px}.provider-status small{font-size:8px;color:#6f8297}.status-on{color:#159360}.status-off{color:#ba7920}.birthday-wish-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 3px;border-bottom:1px solid #edf1f5}.birthday-wish-row:last-child{border-bottom:0}.birthday-wish-row strong{font-size:11px}.birthday-wish-row small{display:block;color:#6c7f94;font-size:9px;margin-top:4px;line-height:1.4}.wish-channel-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}.wish-channel-tags span{font-size:8px;padding:3px 6px;background:#edf4ff;color:#2a639c;border-radius:15px}.wish-status{font-size:8px;font-weight:800;border-radius:15px;padding:4px 7px;background:#eef4fa;color:#546a80;white-space:nowrap}.wish-status.scheduled{background:#e8f8ee;color:#188555}.wish-status.failed{background:#fff0ef;color:#bd4b43}.wish-actions button{border:1px solid #e0e8f1;color:#b54e48;background:#fff;border-radius:7px;padding:6px 8px;font-size:9px}.media-preview-note{font-size:9px;color:#60758b;margin:5px 0}.notification-row{display:grid;grid-template-columns:100px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px;border-bottom:1px solid #edf1f5}.notification-row strong{font-size:10px}.notification-row small{display:block;font-size:8px;color:#6c7f94;margin-top:3px;overflow-wrap:anywhere}.delivery-state{font-size:8px;border-radius:16px;padding:4px 7px;background:#edf4fa;color:#43627f;white-space:nowrap}.delivery-state.sent{background:#e5f7ec;color:#138454}.delivery-state.failed{background:#fff0ef;color:#b94d45}
 .contact-reminder-settings{padding:12px;margin-top:12px;border:1px solid #e1eaf3;background:#f8fbff;border-radius:12px}.contact-reminder-settings>strong{font-size:11px;color:#183756}.contact-reminder-settings>p{font-size:9px;margin:4px 0 8px}.contact-reminder-settings .consent-grid{margin:6px 0}.contact-reminder-settings .consent-option{min-height:45px}
 .provider-setup-steps{font-size:11px;color:#50677f;line-height:1.55;padding-left:21px;max-width:900px}.provider-setup-steps li{padding:4px 0}.provider-setup-steps a{color:#1769b7;font-weight:700}.provider-setup-steps code{font-size:10px;background:#edf3fa;padding:2px 4px;border-radius:4px;color:#173f66}.provider-setup-steps li::marker{color:#2774c5;font-weight:800}
+.provider-setup-steps,.provider-setup-list{font-size:10px;color:#4f6278;line-height:1.65;padding-left:22px}.provider-setup-steps li,.provider-setup-list li{margin:6px 0}.provider-setup-steps a,.provider-setup-list a{color:#145da0;font-weight:700}.provider-setup-steps code,.provider-setup-list code{background:#edf3fa;border-radius:4px;padding:2px 4px;font-size:9px}
 </style></head><header class="topbar">
   <button class="icon-button mobile-menu" type="button" onclick="toggleSidebar()" aria-label="Open menu">☰</button>
   <div class="brand-lockup"><div class="brand-mark"><span>⌂</span><i>✓</i></div><div><div class="brand-name">My Home Warranty</div><div class="brand-subtitle">Home Secure – Family & Asset Management</div></div></div>
@@ -131,7 +132,19 @@
   </ol>
   <button class="action" type="button" onclick="testWhatsAppConnection()">Send WhatsApp test to my own number</button>
   <div id="whatsappTestStatus" class="msg">Test message will only be sent after you press the button and confirm.</div>
-  <p class="muted">Meta requires a recipient opt-in and an approved template for business-initiated messages. A successful API response means Meta accepted the request; delivery receipts are not enabled yet.</p>
+  <p class="muted">Meta requires a recipient opt-in and an approved template for business-initiated messages. A successful API response means Meta accepted the request; delivery receipts are not enabled yet. Some non-transactional wishes may be classified as Marketing templates by Meta.</p>
+  <hr><h3>Email Notifications — Resend</h3>
+  <p class="muted">Create an API key in <a href="https://resend.com/api-keys" target="_blank" rel="noopener">Resend API Keys</a> and verify the sending domain in <a href="https://resend.com/domains" target="_blank" rel="noopener">Resend Domains</a>. Then add these two Production environment variables in Vercel:</p>
+  <ul class="provider-setup-list"><li><code>RESEND_API_KEY</code> — keep it secret</li><li><code>RESEND_FROM_EMAIL</code> — an address on your verified sending domain, e.g. <code>notifications@yourdomain.com</code></li></ul>
+  <button class="action" type="button" onclick="testEmailConnection()">Send Email test to my own account email</button>
+  <div id="emailTestStatus" class="msg">No email is sent until you press the test button and confirm.</div>
+  <hr><h3>SMS Text Notifications — Twilio</h3>
+  <p class="muted">Create a project in <a href="https://console.twilio.com/" target="_blank" rel="noopener">Twilio Console</a>. Add these Production environment variables in Vercel:</p>
+  <ul class="provider-setup-list"><li><code>TWILIO_ACCOUNT_SID</code></li><li><code>TWILIO_AUTH_TOKEN</code> — keep it secret</li><li><code>TWILIO_FROM_NUMBER</code> — an SMS-enabled, approved sender</li></ul>
+  <p class="warn">India SMS: before business or bulk SMS, complete Principal Entity, sender header and content-template registration with your telecom operator’s DLT process. See <a href="https://www.trai.gov.in/advice-to-senders" target="_blank" rel="noopener">TRAI’s sender guidance</a>. Without the required DLT approvals, sending may be blocked.</p>
+  <button class="action" type="button" onclick="testSmsConnection()">Send SMS test to my own account mobile</button>
+  <div id="smsTestStatus" class="msg">No SMS is sent until you press the test button and confirm.</div>
+  <p class="muted">After adding provider credentials, redeploy the Vercel Production project and use the test buttons above. The app never displays or returns secret values.</p>
 </section>
 <section id="notifications" class="module-page hidden">
   <div class="page-title-row"><div><span class="eyebrow">MESSAGE CENTRE</span><h2>Notifications & Message History</h2><p class="muted">View messages queued or accepted by WhatsApp, Email and SMS providers.</p></div><button class="text-link" onclick="loadNotificationHistory()">Refresh ↻</button></div>
@@ -372,6 +385,20 @@ async function testWhatsAppConnection(){
   $('whatsappTestStatus').textContent=(d.message||'Meta accepted the test message.')+(d.recipientLastFour?' Number ending '+d.recipientLastFour+'.':'');
   await loadProviderConfiguration();
  }catch(e){$('whatsappTestStatus').textContent=e.message;}
+}
+async function testEmailConnection(){
+ if(!token){$('emailTestStatus').textContent='Sign in before testing email.';return;}
+ if(!confirm('Send one email test to the email saved on YOUR signed-in account?'))return;
+ $('emailTestStatus').textContent='Sending email test…';
+ try{const d=await api('/v1/notifications/email/test',{method:'POST',body:JSON.stringify({confirmSend:true})});$('emailTestStatus').textContent=d.message||'Email provider accepted the test request.';await loadProviderConfiguration();}
+ catch(e){$('emailTestStatus').textContent=e.message;}
+}
+async function testSmsConnection(){
+ if(!token){$('smsTestStatus').textContent='Sign in before testing SMS.';return;}
+ if(!confirm('Send one SMS test to the mobile saved on YOUR signed-in account? Standard SMS charges may apply.'))return;
+ $('smsTestStatus').textContent='Sending SMS test…';
+ try{const d=await api('/v1/notifications/sms/test',{method:'POST',body:JSON.stringify({confirmSend:true})});$('smsTestStatus').textContent=d.message||'SMS provider accepted the test request.';await loadProviderConfiguration();}
+ catch(e){$('smsTestStatus').textContent=e.message;}
 }
 async function loadNotificationHistory(){
  try{const d=await api('/v1/notifications/deliveries'),rows=d.deliveries||[];const root=$('notificationHistoryRows');if(!rows.length){root.innerHTML='<p class="empty-note">No messages queued yet.</p>';return rows;}
