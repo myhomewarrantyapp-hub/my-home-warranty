@@ -39,6 +39,9 @@ model User {
  reminders Reminder[]
  auditAsActor AuditEvent[] @relation("AuditActor")
  supportTickets SupportTicket[]
+ notificationPreference NotificationPreference?
+ birthdayWishes BirthdayWish[]
+ notificationDeliveries NotificationDelivery[]
 }
 model Asset {
  id String @id @default(cuid())
@@ -167,6 +170,7 @@ model Reminder {
  deliveryStatus String @default("QUEUED")
  createdAt DateTime @default(now())
  owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
+ deliveries NotificationDelivery[]
  @@index([ownerUserId,remindAt])
 }
 model AuditEvent {
@@ -199,4 +203,74 @@ model SiteControl {
  maintenanceMode Boolean @default(false)
  notice String @default("The website is temporarily unavailable. Please try again later.")
  updatedAt DateTime @updatedAt
+}
+
+model NotificationPreference {
+ id String @id @default(cuid())
+ ownerUserId String @unique
+ emailEnabled Boolean @default(false)
+ whatsappEnabled Boolean @default(false)
+ smsEnabled Boolean @default(false)
+ updatedAt DateTime @updatedAt
+ owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
+}
+
+model BirthdayWish {
+ id String @id @default(cuid())
+ ownerUserId String
+ recipientName String
+ recipientMobile String?
+ recipientEmail String?
+ birthDate DateTime
+ scheduledAt DateTime
+ timezone String @default("Asia/Kolkata")
+ message String?
+ recurringYearly Boolean @default(false)
+ whatsappEnabled Boolean @default(false)
+ smsEnabled Boolean @default(false)
+ emailEnabled Boolean @default(false)
+ whatsappConsent Boolean @default(false)
+ smsConsent Boolean @default(false)
+ emailConsent Boolean @default(false)
+ mediaPath String?
+ mediaContentType String?
+ mediaOriginalName String?
+ mediaShareTokenHash String? @unique
+ mediaShareExpiresAt DateTime?
+ status String @default("SCHEDULED")
+ deliveryNote String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
+ deliveries NotificationDelivery[]
+ @@index([ownerUserId,scheduledAt])
+ @@index([status,scheduledAt])
+}
+
+model NotificationDelivery {
+ id String @id @default(cuid())
+ ownerUserId String
+ reminderId String?
+ birthdayWishId String?
+ channel String
+ recipient String
+ subject String?
+ message String
+ scheduledAt DateTime
+ status String @default("QUEUED")
+ attempts Int @default(0)
+ nextAttemptAt DateTime @default(now())
+ providerMessageId String?
+ lastError String?
+ idempotencyKey String @unique
+ sentAt DateTime?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
+ reminder Reminder? @relation(fields:[reminderId],references:[id],onDelete:Cascade)
+ birthdayWish BirthdayWish? @relation(fields:[birthdayWishId],references:[id],onDelete:Cascade)
+ @@index([status,nextAttemptAt])
+ @@index([ownerUserId,createdAt])
+ @@index([reminderId])
+ @@index([birthdayWishId])
 }
