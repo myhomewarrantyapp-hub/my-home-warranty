@@ -229,10 +229,11 @@ model NotificationPreference {
 model BirthdayWish {
  id String @id @default(cuid())
  ownerUserId String
+ wishType String @default("BIRTHDAY")
  recipientName String
  recipientMobile String?
  recipientEmail String?
- birthDate DateTime
+ birthDate DateTime?
  scheduledAt DateTime
  timezone String @default("Asia/Kolkata")
  message String?
