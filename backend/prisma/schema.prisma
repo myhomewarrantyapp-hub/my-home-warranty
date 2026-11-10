@@ -211,6 +211,9 @@ model NotificationPreference {
  emailEnabled Boolean @default(false)
  whatsappEnabled Boolean @default(false)
  smsEnabled Boolean @default(false)
+ emailConsentAt DateTime?
+ whatsappConsentAt DateTime?
+ smsConsentAt DateTime?
  updatedAt DateTime @updatedAt
  owner User @relation(fields:[ownerUserId],references:[id],onDelete:Cascade)
 }
@@ -232,6 +235,9 @@ model BirthdayWish {
  whatsappConsent Boolean @default(false)
  smsConsent Boolean @default(false)
  emailConsent Boolean @default(false)
+ whatsappConsentAt DateTime?
+ smsConsentAt DateTime?
+ emailConsentAt DateTime?
  mediaPath String?
  mediaContentType String?
  mediaOriginalName String?
