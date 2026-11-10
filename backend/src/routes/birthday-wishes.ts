@@ -1,7 +1,7 @@
 import { Router, Response } from "express";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { handleUpload } from "@vercel/blob/client";
-import { get } from "@vercel/blob";
+import { get, head, issueSignedToken, presignUrl } from "@vercel/blob";
 import { Readable } from "node:stream";
 import { createHash } from "node:crypto";
 import { prisma } from "../db";
@@ -120,59 +120,80 @@ router.post("/", authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.post("/upload-token", authenticate, async (req: AuthRequest, res: Response) => {
+router.post("/:id/media-upload-url", authenticate, async (req: AuthRequest, res) => {
   try {
-    const payload = z.object({
-      wishId: z.string().min(1),
+    const v = z.object({
       originalName: z.string().min(1).max(180),
       contentType: z.enum(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]),
-    }).parse(JSON.parse(String(req.body?.clientPayload || "{}")));
+      sizeBytes: z.number().int().positive(),
+    }).parse(req.body);
+    const maxBytes = v.contentType.startsWith("video/") ? 100 * 1024 * 1024 : 12 * 1024 * 1024;
+    if (v.sizeBytes > maxBytes) return res.status(413).json({ error: "This file is larger than the allowed size." });
+
     const wish = await prisma.birthdayWish.findFirst({
-      where: { id: payload.wishId, ownerUserId: req.userId },
+      where: { id: req.params.id, ownerUserId: req.userId, status: "SCHEDULED" },
       select: { id: true },
     });
-    if (!wish) return res.status(404).json({ error: "Birthday wish not found." });
+    if (!wish) return res.status(404).json({ error: "Scheduled birthday wish not found." });
 
-    const response = await handleUpload({
-      body: req.body,
-      request: req as any,
-      onBeforeGenerateToken: async (pathname, clientPayload) => {
-        const data = z.object({
-          wishId: z.string(),
-          originalName: z.string(),
-          contentType: z.enum(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]),
-        }).parse(JSON.parse(clientPayload || "{}"));
-        if (data.wishId !== wish.id || !pathname.startsWith("birthday-wishes/" + req.userId + "/" + wish.id + "/")) {
-          throw new Error("Invalid birthday media upload target.");
-        }
-        return {
-          access: "private",
-          addRandomSuffix: true,
-          allowedContentTypes: [data.contentType],
-          maximumSizeInBytes: data.contentType.startsWith("video/") ? 100 * 1024 * 1024 : 12 * 1024 * 1024,
-          tokenPayload: JSON.stringify({ ownerUserId: req.userId, wishId: wish.id, originalName: data.originalName }),
-        };
-      },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        const data = z.object({ ownerUserId: z.string(), wishId: z.string(), originalName: z.string() }).parse(JSON.parse(tokenPayload));
-        await prisma.birthdayWish.updateMany({
-          where: { id: data.wishId, ownerUserId: data.ownerUserId },
-          data: {
-            mediaPath: blob.pathname,
-            mediaContentType: blob.contentType,
-            mediaOriginalName: data.originalName,
-            mediaShareTokenHash: null,
-            mediaShareExpiresAt: null,
-          },
-        });
-      },
+    const extension = ({
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+      "video/mp4": "mp4", "video/webm": "webm",
+    } as Record<string, string>)[v.contentType];
+    const pathname = "birthday-wishes/" + req.userId + "/" + wish.id + "/" + randomUUID() + "." + extension;
+    const signedToken = await issueSignedToken({
+      pathname,
+      operations: ["put"],
+      allowedContentTypes: [v.contentType],
+      maximumSizeInBytes: maxBytes,
     });
-    res.status(200).json(response);
+    const { presignedUrl } = await presignUrl(signedToken, {
+      pathname,
+      operation: "put",
+      access: "private",
+      validUntil: Date.now() + 10 * 60 * 1000,
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ presignedUrl, pathname, expiresInSeconds: 600 });
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Unable to prepare media upload." });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Unable to prepare private media upload." });
   }
 });
 
+router.post("/:id/media-complete", authenticate, async (req: AuthRequest, res) => {
+  try {
+    const v = z.object({
+      pathname: z.string().min(1).max(950),
+      originalName: z.string().min(1).max(180),
+      contentType: z.enum(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]),
+    }).parse(req.body);
+    const prefix = "birthday-wishes/" + req.userId + "/" + req.params.id + "/";
+    if (!v.pathname.startsWith(prefix) || v.pathname.includes("..")) {
+      return res.status(400).json({ error: "Invalid private media path." });
+    }
+    const wish = await prisma.birthdayWish.findFirst({
+      where: { id: req.params.id, ownerUserId: req.userId, status: "SCHEDULED" },
+      select: { id: true },
+    });
+    if (!wish) return res.status(404).json({ error: "Scheduled birthday wish not found." });
+    const blob = await head(v.pathname, { access: "private" });
+    if (blob.contentType !== v.contentType) return res.status(400).json({ error: "Uploaded media type does not match the selected file." });
+
+    await prisma.birthdayWish.update({
+      where: { id: wish.id },
+      data: {
+        mediaPath: v.pathname,
+        mediaContentType: v.contentType,
+        mediaOriginalName: v.originalName,
+        mediaShareTokenHash: null,
+        mediaShareExpiresAt: null,
+      },
+    });
+    res.json({ success: true, mediaOriginalName: v.originalName, contentType: v.contentType });
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Unable to verify uploaded media." });
+  }
+});
 router.patch("/:id", authenticate, async (req: AuthRequest, res) => {
   try {
     const v = z.object({ status: z.enum(["CANCELLED"]) }).parse(req.body);
