@@ -195,9 +195,25 @@ async function queueDueBirthdays(now: Date) {
       shareUrl = base + "/v1/birthday-wishes/public-media/" + token;
     }
 
+    const occasion = ({
+      BIRTHDAY: "Happy Birthday",
+      ANNIVERSARY: "Happy Anniversary",
+      FESTIVAL: "Warm festival wishes",
+      CONGRATULATIONS: "Congratulations",
+      HOUSEWARMING: "Happy Housewarming",
+      CUSTOM: "A special wish",
+    } as Record<string, string>)[wish.wishType] || "A special wish";
+    const defaultMessage = ({
+      BIRTHDAY: "Wishing you a wonderful birthday filled with happiness.",
+      ANNIVERSARY: "Wishing you both many more years of love and happiness.",
+      FESTIVAL: "May this festival bring happiness, peace and prosperity.",
+      CONGRATULATIONS: "Congratulations on your wonderful achievement!",
+      HOUSEWARMING: "Wishing you happiness and wonderful memories in your new home.",
+      CUSTOM: "Sending you warm wishes on this special occasion.",
+    } as Record<string, string>)[wish.wishType] || "Sending you warm wishes.";
     const message = [
-      "Happy Birthday, " + wish.recipientName + "!",
-      wish.message || "Wishing you a wonderful birthday filled with happiness.",
+      occasion + ", " + wish.recipientName + "!",
+      wish.message || defaultMessage,
       shareUrl ? "Your photo/video: " + shareUrl : "",
     ].filter(Boolean).join("\n");
     const stamp = wish.scheduledAt.toISOString();
@@ -205,7 +221,7 @@ async function queueDueBirthdays(now: Date) {
       items.push({
         ownerUserId: wish.ownerUserId, birthdayWishId: wish.id,
         channel: "EMAIL", recipient: wish.recipientEmail,
-        subject: "Birthday wishes for " + wish.recipientName, message,
+        subject: occasion + " for " + wish.recipientName, message,
         scheduledAt: wish.scheduledAt,
         idempotencyKey: "birthday/" + wish.id + "/" + stamp + "/EMAIL",
       });
@@ -214,7 +230,7 @@ async function queueDueBirthdays(now: Date) {
       items.push({
         ownerUserId: wish.ownerUserId, birthdayWishId: wish.id,
         channel: "WHATSAPP", recipient: e164(wish.recipientMobile),
-        subject: "Happy Birthday, " + wish.recipientName, message,
+        subject: occasion + ", " + wish.recipientName, message,
         scheduledAt: wish.scheduledAt,
         idempotencyKey: "birthday/" + wish.id + "/" + stamp + "/WHATSAPP",
       });
@@ -278,7 +294,7 @@ async function sendWhatsApp(delivery: { recipient: string; subject: string | nul
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const template = delivery.birthdayWishId
-    ? (process.env.WHATSAPP_BIRTHDAY_TEMPLATE_NAME || "mhw_birthday_wish")
+    ? (process.env.WHATSAPP_WISH_TEMPLATE_NAME || "mhw_scheduled_wish")
     : (process.env.WHATSAPP_TEMPLATE_NAME || "mhw_reminder");
   const version = (process.env.WHATSAPP_API_VERSION || "v26.0").replace(/^\\/?|\\/$/g, "");
   const language = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US";
