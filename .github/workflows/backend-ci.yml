@@ -114,7 +114,9 @@ jobs:
           for (const candidate of pagesCandidates) {
             const response = await fetch(candidate);
             const html = await response.text();
-            const title = (html.match(/<title[^>]*>([^<]*)<\\/title>/i) || [,'(no title)'])[1].trim();
+            const titleStart = html.indexOf('<title');
+            const titleEnd = titleStart >= 0 ? html.indexOf('>', titleStart) : -1;
+            const title = titleEnd >= 0 ? html.slice(titleStart, titleEnd + 1) : '(no title)';
             console.log('Pages candidate ' + candidate + ': HTTP ' + response.status + ', title=' + title);
             if (response.ok && html.includes('My Home Warranty') && html.includes(base)) {
               pagesUrl = candidate;
