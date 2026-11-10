@@ -15,6 +15,10 @@ on:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
 
+permissions:
+  contents: read
+  pages: read
+
 jobs:
   validate-and-build:
     runs-on: ubuntu-latest
@@ -71,13 +75,41 @@ jobs:
       - name: Validate translation JSON
         working-directory: .
         run: node -e "JSON.parse(require('fs').readFileSync('translations/te.json','utf8')); console.log('Telugu translation JSON valid')"
+      - name: Inspect GitHub Pages publishing settings
+        working-directory: .
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          (async () => {
+            const response = await fetch('https://api.github.com/repos/myhomewarrantyapp-hub/my-home-warranty/pages', {
+              headers: {
+                Authorization: 'Bearer ' + process.env.GITHUB_TOKEN,
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+              }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              console.log('Pages settings API unavailable: HTTP ' + response.status);
+              return;
+            }
+            console.log('Published Pages URL: ' + (data.html_url || '(not returned)'));
+            console.log('Pages build type: ' + (data.build_type || '(not returned)'));
+            console.log('Pages source: ' + JSON.stringify(data.source || null));
+            if (data.html_url) {
+              fs.appendFileSync(process.env.GITHUB_ENV, 'GITHUB_PAGES_URL=' + data.html_url + '\n');
+            }
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
       - name: Smoke test live production API and browser CORS
         working-directory: .
         run: |
           node - <<'NODE'
           const base = 'https://my-home-warranty-api.vercel.app';
           const origin = 'https://myhomewarrantyapp-hub.github.io';
-          const pagesCandidates = [origin + '/my-home-warranty/', origin + '/'];
+          const pagesCandidates = [...new Set([process.env.GITHUB_PAGES_URL, origin + '/my-home-warranty/', origin + '/'].filter(Boolean))];
           let pagesUrl = '';
           for (const candidate of pagesCandidates) {
             const response = await fetch(candidate);
