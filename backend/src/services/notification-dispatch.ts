@@ -305,7 +305,7 @@ async function sendWhatsApp(delivery: { recipient: string; subject: string | nul
   if (!version.startsWith("v") || versionParts.length !== 2 || versionParts.some(part => !part || !Number.isInteger(Number(part)))) {
     throw new Error("WHATSAPP_API_VERSION must look like v26.0.");
   }
-  const response = await fetch("https://graph.facebook.com/" + version + "/" + phoneId + "/messages",
+  const response = await fetch("https://graph.facebook.com/" + version + "/" + phoneId + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
     body: JSON.stringify({
