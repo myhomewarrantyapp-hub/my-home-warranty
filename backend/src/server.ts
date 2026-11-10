@@ -7,6 +7,7 @@ import {prisma} from "./db";
 import routes from "./routes";
 
 const app=express();
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors({origin:(process.env.CORS_ORIGIN||"").split(",").filter(Boolean)}));
