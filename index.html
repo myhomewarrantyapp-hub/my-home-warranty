@@ -263,7 +263,7 @@ async function refreshAll(){if(!token){renderDashboard();return;}await Promise.a
  load('documents','/v1/documents','documents','documentsRows',[['originalName','File'],['mimeType','Type'],['sizeBytes','Bytes'],['scanStatus','Scan status']]),
  load('p','/v1/payment-requests','requests','requestRows',[['recipientName','Recipient'],['amount','Amount'],['purpose','Purpose'],['status','Status']]),
  loadReminders(),
- load('w','/v1/birthday-wishes','wishes','birthdayWishRows',[])
+ loadBirthdayWishes()
  ]);renderDashboard();}
 bind('assetForm','/v1/assets',o=>({...o,warrantyEnd:dateISO(o.warrantyEnd)}),()=>load('a','/v1/assets','assets','assetRows',[['title','Asset'],['category','Category'],['warrantyEnd','Warranty end']]));
 async function loadVehicles(){const rows=await load('v','/v1/vehicles','vehicles','vehicleRows',[['nickname','Vehicle'],['makeModel','Model'],['registrationLastFour','Reg. last 4'],['currentOdometer','Odometer']]);const sel=$('eventVehicle');if(sel){const keep=sel.value;sel.innerHTML='<option value="">Select vehicle</option>'+rows.map(v=>'<option value="'+String(v.id).replace(/[^a-zA-Z0-9_-]/g,'')+'">'+String(v.nickname).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</option>').join('');if(rows.some(v=>v.id===keep))sel.value=keep;}await loadVehicleEvents();}
