@@ -17,6 +17,9 @@ on:
 jobs:
   validate-and-build:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
     services:
       postgres:
         image: postgres:16
@@ -41,16 +44,10 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npx prisma validate
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
       - name: Apply versioned migrations to temporary PostgreSQL
         run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
       - name: Confirm migration state
         run: npx prisma migrate status
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mhw_ci
       - run: npx prisma generate
       - run: npm run build
       - name: Validate frontend JavaScript
