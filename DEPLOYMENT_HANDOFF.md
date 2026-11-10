@@ -1,45 +1,66 @@
-# Deployment handoff — My Home Warranty
+# My Home Warranty — project handoff
 
-## Current repository state
-This is an active work-in-progress on `phase19-admin-controls`. The `main` branch has not been changed. The branch contains a mobile-first frontend starter, an Express API starter, a Prisma data model, authentication routes, role-protected site controls, owner-scoped record routes, document metadata listing, audit logging, and a Telugu translation starter.
+Last verified: 2026-11-10
 
-## Implemented in source (not yet production-verified)
-- Registration and login using bcrypt password hashes and short-lived JWTs.
-- Roles including USER, SUPPORT, ADMIN, and SUPER_ADMIN; a controlled script promotes an already-registered account.
-- Site visibility and maintenance controls restricted to SUPER_ADMIN.
-- Owner-scoped create/list routes for assets, vehicles, bills, money entries, insurance policies, payment requests, and support tickets.
-- Document metadata listing; actual private file upload/download and malware scanning are not implemented.
-- Basic frontend screens for the main modules.
-- Payments & Money contains Home Bills, Credit Card Bills, Money Given, Money Received, Payment Requests, and All Transactions; bill and money tabs filter their own record types.
-- Reminder UI supports creating, listing, completing, and cancelling owner-scoped reminders. Reminder delivery is not yet scheduled/pushed automatically; this is an in-app record workflow only.
-- Vehicle maintenance history API and UI support service/repair/insurance/PUC/tyre/other events, dates, odometer, cost, notes, and next-due details, with vehicle ownership checks.
-- A GitHub Actions workflow starts a temporary PostgreSQL 16 service, applies and checks the versioned Prisma migration, validates/generates the Prisma client, compiles the backend, checks frontend JavaScript syntax, and parses the Telugu translation JSON.
-- A Vercel serverless entry point and routing configuration are included under `backend/api/` and `backend/vercel.json`.
+## Repository and deployment layout
 
-## Not production-ready
-CI has passed on the latest frontend, vehicle-history, and reminder changes, including PostgreSQL 16 migration deployment/status checks, Prisma validation/generation, TypeScript build, frontend JavaScript syntax, and Telugu translation JSON parsing. No database connection, backend host, JWT secret, CORS origin, private storage bucket, or SUPER_ADMIN account has been configured. The Vercel configuration is source-only and has not been deployed or smoke-tested. The frontend's API URL and full user workflows still need integration testing. Do not enter real customer data or expose this API as a production application yet.
+- GitHub repository: `myhomewarrantyapp-hub/my-home-warranty`.
+- Development/integration branch: `phase19-admin-controls`.
+- GitHub Pages publishes from `main:/` (legacy source). To make the new frontend live while keeping backend work off `main`, only `main/index.html` was updated with the reviewed root frontend from `phase19-admin-controls`. The backend source and database migrations were not merged into `main`.
+- GitHub Pages URL: https://myhomewarrantyapp-hub.github.io/my-home-warranty/
+- Vercel API project: `my-home-warranty-api`.
+- Production API URL: https://my-home-warranty-api.vercel.app
+- Production API deployment: `dpl_6gj1STfkVWxJVfywXw5ARj8v56us`, READY, built from commit `45ad7ec8dd66b11d47ea754d8eb1429ed11dc8df`.
+- Supabase PostgreSQL project: `my-home-warranty`, ACTIVE_HEALTHY, region `ap-south-1`.
 
-## Required next steps
-1. Complete frontend/API integration, including reliable date handling, record editing/deletion, dashboard counts, and all 23 translations.
-2. Implement private document upload/download, access controls, file validation, and malware scanning.
-3. Add automated unit/integration tests and complete a security review (including session handling, rate limits, CORS, and admin bootstrap).
-4. Deploy the `backend/` folder as a Vercel project on its free Hobby tier if eligible, and configure `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` (at least 32 random characters), and `CORS_ORIGIN` in Vercel environment variables. Never commit secrets or send them in chat.
-5. Configure Supabase PostgreSQL and apply reviewed Prisma migrations before using registration or records. Do not use `prisma db push` against a live database without a verified backup.
-6. Deploy to staging, verify critical workflows, backups, and restore procedures, then consider production.
-7. Keep `main` unchanged until the owner reviews and explicitly approves a pull request.
+## Implemented in source
 
-## Supabase PostgreSQL setup (owner action required)
+- Express API with registration/login, bcrypt password hashes, short-lived JWTs, role checks and audit logging.
+- Roles: USER, SUPPORT, ADMIN and SUPER_ADMIN. Existing accounts can be promoted through the controlled admin-promotion script; there is no public admin bootstrap route.
+- Owner-scoped asset, vehicle, bill, money entry, insurance, payment request and support-ticket create/list endpoints.
+- Vehicle service/maintenance history, including service/repair/insurance/PUC/tyre/other events, dates, odometer, cost and next-due information.
+- Payments & Money grouped into one module with Home Bills, Credit Card Bills, Money Given, Money Received, Payment Requests and All Transactions.
+- Reminder create/list/complete/cancel workflow. Automatic scheduled notifications and WhatsApp delivery are not implemented.
+- Admin site visibility/maintenance controls restricted to SUPER_ADMIN.
+- Document metadata listing. Private file upload/download, access controls and malware scanning are not implemented.
+- Frontend with dashboard, assets, vehicles, Payments & Money, insurance, reminders, documents, support, settings and admin screens.
+- Navigation now reloads the corresponding module data; sign-out clears the tab token and displayed records.
+- GitHub Actions CI verifies PostgreSQL 16 migrations, Prisma validation/generation, TypeScript build, both frontend scripts, Telugu JSON parsing, GitHub Pages publication and production API/CORS/auth-gate smoke tests.
 
-The initial Prisma migration is committed at `backend/prisma/migrations/20261110090000_init/migration.sql`. CI now starts a temporary PostgreSQL 16 service and runs `prisma migrate deploy` plus `prisma migrate status` against it before building. This validates the migration in CI but does not touch the owner's Supabase project.
+## Latest successful verification
 
-To connect the real Supabase database safely:
-1. Open the Supabase project dashboard and select **Project Settings → Database → Connection string**. Use the URI connection string and require SSL. Prefer the Supabase pooler/session-compatible URI if deploying on serverless; follow the dashboard's current recommendation.
-2. In the Vercel project settings for the backend, set `DATABASE_URL` to the Supabase Transaction Pooler URI (port 6543, with the pooler options recommended by Supabase), and `DIRECT_URL` to the Session Pooler URI (port 5432) for Prisma migrations. Set `JWT_SECRET` to a newly generated random value of at least 32 characters and `CORS_ORIGIN` to the exact deployed frontend origin. Never put these values in GitHub source, commits, screenshots, or chat.
-3. Set the Vercel project root to `backend`. Set the Build Command to `npm run vercel-build` (this runs Prisma Client generation, versioned migrations, and the TypeScript build). Keep the Production Branch set to `phase19-admin-controls`; do not deploy `main`. Deploy first to a private/staging environment and verify the build logs show the migration applied.
-4. If Vercel build logs report a database connectivity issue, stop and correct the connection string/network mode in the dashboard; do not paste the password into chat.
-5. After the first successful migration, create a normal account through the app, then use the documented admin-promotion procedure from a secure trusted environment to grant SUPER_ADMIN. Do not expose a public admin bootstrap endpoint.
+GitHub Actions run [42782924294](https://github.com/myhomewarrantyapp-hub/my-home-warranty/actions/runs/42782924294) passed.
 
-The assistant cannot access the owner's Supabase dashboard or secrets through this repository connection, so it cannot apply the migration to the live project or deploy Vercel on the owner's behalf. Do not enter real personal or financial data until staging workflows and security checks pass.
+It confirmed:
+- GitHub Pages serves the current app HTML at the URL above.
+- Production API health and site-status endpoints respond correctly.
+- GitHub Pages origin CORS preflight is allowed.
+- A request to the protected vehicle endpoint without a token receives HTTP 401.
+- The code and database migration build checks pass.
 
-## Hosting and visibility
-GitHub Pages and the API are separate deployments. The private/maintenance switch blocks API access but cannot unpublish the static GitHub Pages site. Disable Pages separately if the entire site must be hidden.
+The production Prisma build reports no pending migrations. Supabase migration history contains:
+- `20261110090000_init`
+- `20261110100000_harden_public_access_and_index_vehicle_event`
+
+Database access hardening is applied and verified: direct table/sequence grants to `anon` and `authenticated` are revoked; `anon` cannot execute `public.rls_auto_enable()`; the VehicleEvent lookup index exists.
+
+## Important security and readiness caveats
+
+- CI smoke testing is not a substitute for a complete browser-based signed-in test. Registration, login, owner-scoped CRUD and SUPER_ADMIN workflows still need testing with a disposable account in staging.
+- The frontend stores its short-lived bearer token in browser `sessionStorage`. A production-grade session should move to secure HttpOnly cookies and include an MFA review.
+- Supabase RLS is enabled on public tables, but no per-table policies are currently defined. Public Data API table grants are revoked; the Express API uses its private database connection and enforces ownership in its routes. Do not re-enable public Supabase table grants without a reviewed RLS policy model.
+- Document upload/download and malware scanning are not implemented.
+- Reminder delivery is not scheduled or pushed automatically.
+- The Telugu translation file is a starter; the language selector does not yet translate the entire UI. Hindi translation is also incomplete.
+- Record editing/deletion and full integration tests remain outstanding.
+- Do not enter real customer, personal, insurance, vehicle registration or financial data until the remaining security checks and workflows are complete.
+
+## Next work
+
+1. Build a staging-only end-to-end test for registration/login and owner-scoped assets, vehicles, service events, bills, money entries, payment requests, insurance, reminders and support.
+2. Establish and securely promote the first SUPER_ADMIN account.
+3. Harden sessions and review authorization, rate limiting, CORS and audit trails.
+4. Implement private document storage with file validation and malware scanning.
+5. Add scheduled in-app reminder delivery; only add WhatsApp after a supported provider integration and explicit permissions.
+6. Finish all translations and test date handling on mobile.
+7. Add edit/delete operations and restore/backup verification before accepting real user data.
