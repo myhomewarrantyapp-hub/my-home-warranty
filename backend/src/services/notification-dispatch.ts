@@ -290,7 +290,7 @@ async function sendEmail(delivery: { recipient: string; subject: string | null; 
   return String(data.id || "");
 }
 
-async function sendWhatsApp(delivery: { recipient: string; subject: string | null; message: string; idempotencyKey: string }) {
+async function sendWhatsApp(delivery: { recipient: string; subject: string | null; message: string; idempotencyKey: string; birthdayWishId?: string | null }) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const template = delivery.birthdayWishId
@@ -398,7 +398,7 @@ async function finishBirthdayWishes() {
 
 function channelIsConfigured(channel: string) {
   if (channel === "EMAIL") return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
-  if (channel === "WHATSAPP") return Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_TEMPLATE_NAME && process.env.WHATSAPP_API_VERSION);
+  if (channel === "WHATSAPP") return Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
   if (channel === "SMS") return Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER);
   return false;
 }
