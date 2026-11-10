@@ -301,7 +301,8 @@ async function sendWhatsApp(delivery: { recipient: string; subject: string | nul
   if (!token || !phoneId) {
     throw new Error("WhatsApp is not configured. Add the Meta Cloud API access token and phone number ID in Vercel.");
   }
-  if (!/^v\\d+\\.\\d+$/.test(version)) {
+  const versionParts = version.slice(1).split(".");
+  if (!version.startsWith("v") || versionParts.length !== 2 || versionParts.some(part => !part || !Number.isInteger(Number(part)))) {
     throw new Error("WHATSAPP_API_VERSION must look like v26.0.");
   }
   const response = await fetch("https://graph.facebook.com/" + version + "/" + phoneId + "/messages",
